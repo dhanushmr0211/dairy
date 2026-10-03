@@ -284,3 +284,37 @@ Response:
 - Final Amount = `total_amount - feed_deduction`
 - Milk entry stores no rate and uses active cycle automatically
 - Only one active cycle per farmer enforced by partial unique index
+
+## 7) New/Updated APIs
+
+- `GET /payments/preview/:cycleId` - Preview cycle payout before payment
+- `GET /farmers/:id/summary` - Active cycle + computed payout summary
+- `GET /dashboard` - Overall dashboard stats (farmers, milk today, active/unpaid cycles, expected payout)
+
+## 8) Production Readiness Improvements
+
+- Feed deduction is calculated only for feed records between `cycle.start_date` and `cycle.end_date`
+- Cycle payment is processed in a DB transaction with row locking
+- Guards added for:
+  - no active cycle milk entry
+  - duplicate active cycle creation
+  - already paid cycle payment attempts
+- Added global + payment-specific rate limiting
+- Added request logging with `morgan`
+- Added CORS configuration (`CORS_ORIGIN`)
+- Added aggregation-focused indexes:
+  - `idx_milk_entries_date`
+  - `idx_farmer_cycles_status`
+
+## 9) Render Deployment Steps
+
+1. Create a new Web Service in Render from this repository.
+2. Set **Build Command**: `npm install`
+3. Set **Start Command**: `npm start`
+4. Add environment variables:
+   - `NODE_ENV=production`
+   - `PORT=10000` (Render provides this automatically; app uses `process.env.PORT`)
+   - `DATABASE_URL=<your_neon_connection_string>`
+   - `CORS_ORIGIN=<frontend_url>`
+5. Ensure Neon DB has schema applied from `db/schema.sql`.
+6. Deploy and verify `GET /health`.

@@ -43,6 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_milk_entries_farmer_date
 CREATE INDEX IF NOT EXISTS idx_milk_entries_cycle_id
     ON milk_entries (cycle_id);
 
+CREATE INDEX IF NOT EXISTS idx_milk_entries_date
+    ON milk_entries (date);
+
 CREATE TABLE IF NOT EXISTS feed_records (
     id BIGSERIAL PRIMARY KEY,
     farmer_id BIGINT NOT NULL REFERENCES farmers(id) ON DELETE CASCADE,
@@ -55,6 +58,9 @@ CREATE TABLE IF NOT EXISTS feed_records (
 
 CREATE INDEX IF NOT EXISTS idx_feed_records_farmer_date
     ON feed_records (farmer_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_farmer_cycles_status
+    ON farmer_cycles (status);
 
 CREATE TABLE IF NOT EXISTS payments (
     id BIGSERIAL PRIMARY KEY,

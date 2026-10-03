@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.post('/', farmerController.createFarmer);
 router.get('/', farmerController.getFarmers);
+router.get('/:id/summary', farmerController.getFarmerSummary);
 
 module.exports = router;
