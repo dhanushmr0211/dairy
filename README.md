@@ -101,7 +101,8 @@ dairy/
 │   │   ├── milkController.js
 │   │   └── paymentController.js
 │   ├── middleware/
-│   │   └── errorHandler.js
+│   │   ├── errorHandler.js
+│   │   └── rateLimiter.js
 │   ├── models/
 │   │   ├── cycleModel.js
 │   │   ├── farmerModel.js
