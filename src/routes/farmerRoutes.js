@@ -1,0 +1,9 @@
+const express = require('express');
+const farmerController = require('../controllers/farmerController');
+
+const router = express.Router();
+
+router.post('/', farmerController.createFarmer);
+router.get('/', farmerController.getFarmers);
+
+module.exports = router;
