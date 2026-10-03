@@ -1,0 +1,27 @@
+{
+  "name": "dairy",
+  "version": "1.0.0",
+  "description": "management",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "echo \"No test suite configured\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/dhanushmr0211/dairy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
