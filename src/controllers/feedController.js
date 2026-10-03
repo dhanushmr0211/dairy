@@ -1,5 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const feedModel = require('../models/feedModel');
+const farmerModel = require('../models/farmerModel');
+const { parseNonNegativeNumber, parsePositiveInteger, parseValidDate } = require('../utils/validation');
 
 const addFeedRecord = asyncHandler(async (req, res) => {
   const { farmerId, date, item, quantity, amount } = req.body;
@@ -10,16 +12,26 @@ const addFeedRecord = asyncHandler(async (req, res) => {
     });
   }
 
-  if (Number(quantity) < 0 || Number(amount) < 0) {
+  const parsedFarmerId = parsePositiveInteger(farmerId);
+  if (!parsedFarmerId) {
+    return res.status(400).json({ message: 'farmerId must be a positive integer.' });
+  }
+
+  if (parseNonNegativeNumber(quantity) === null || parseNonNegativeNumber(amount) === null) {
     return res.status(400).json({ message: 'quantity and amount cannot be negative.' });
   }
 
-  if (Number.isNaN(new Date(date).getTime())) {
+  if (!parseValidDate(date)) {
     return res.status(400).json({ message: 'date must be a valid date (YYYY-MM-DD).' });
   }
 
+  const farmer = await farmerModel.findFarmerById(parsedFarmerId);
+  if (!farmer) {
+    return res.status(404).json({ message: 'Farmer not found.' });
+  }
+
   const record = await feedModel.createFeedRecord({
-    farmerId,
+    farmerId: parsedFarmerId,
     date,
     item: String(item).trim(),
     quantity,
@@ -30,7 +42,17 @@ const addFeedRecord = asyncHandler(async (req, res) => {
 });
 
 const getFeedByFarmer = asyncHandler(async (req, res) => {
-  const records = await feedModel.getFeedRecordsByFarmerId(req.params.farmerId);
+  const parsedFarmerId = parsePositiveInteger(req.params.farmerId);
+  if (!parsedFarmerId) {
+    return res.status(400).json({ message: 'farmerId must be a positive integer.' });
+  }
+
+  const farmer = await farmerModel.findFarmerById(parsedFarmerId);
+  if (!farmer) {
+    return res.status(404).json({ message: 'Farmer not found.' });
+  }
+
+  const records = await feedModel.getFeedRecordsByFarmerId(parsedFarmerId);
   res.json(records);
 });
 

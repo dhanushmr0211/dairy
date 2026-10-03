@@ -34,8 +34,19 @@ async function getTotalLitersByCycleId(cycleId, client = db) {
   return Number(result.rows[0].total_liters);
 }
 
+async function getTodayMilkTotal(client = db) {
+  const result = await client.query(
+    `SELECT COALESCE(SUM(liters), 0)::NUMERIC(12,2) AS total_milk_today
+     FROM milk_entries
+     WHERE date = CURRENT_DATE`
+  );
+
+  return Number(result.rows[0].total_milk_today);
+}
+
 module.exports = {
   createMilkEntry,
   getMilkEntriesByFarmerId,
   getTotalLitersByCycleId,
+  getTodayMilkTotal,
 };
