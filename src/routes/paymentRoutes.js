@@ -5,19 +5,21 @@ const { paymentRateLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 router.use(paymentRateLimiter);
 
-// Preview & aggregations
+// ── Financial summaries & filtered queues ──
+router.get('/pending', paymentController.getPendingPayments);
+router.get('/financial-summary', paymentController.getFinancialSummary);
 router.get('/upcoming', paymentController.getUpcomingPayments);
 router.get('/summary', paymentController.getPaymentSummary);
 router.get('/preview/:cycleId', paymentController.getPaymentPreview);
 
-// Multi-farmer operations
+// ── Live calculator & multi-cycle operations ──
 router.post('/selected', paymentController.getSelectedPaymentsPreview);
 router.post('/pay-selected', paymentController.paySelectedCycles);
 
-// Single cycle pay
+// ── Single cycle pay ──
 router.post('/pay', paymentController.payCycle);
 
-// Farmer history (must be after named subpaths)
+// ── Farmer payment history (must remain after named subpaths) ──
 router.get('/:farmerId', paymentController.getPaymentsByFarmer);
 
 module.exports = router;

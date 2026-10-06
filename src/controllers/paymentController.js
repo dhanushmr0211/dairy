@@ -13,6 +13,257 @@ function getDaysDiff(targetDateStr, baseDateStr) {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Calculates live financial metrics from the list of unpaid cycles and selected cycle IDs.
+ */
+function computeFinancialMetrics(unpaidCycles, selectedIdsSet = new Set(), todayStr) {
+  let curOverdueAmount = 0;
+  let curPendingAmount = 0;
+  let curOverdueCount = 0;
+  let curPendingCount = 0;
+
+  let selOverdueAmount = 0;
+  let selPendingAmount = 0;
+  let selOverdueCount = 0;
+  let selPendingCount = 0;
+
+  for (const c of unpaidCycles) {
+    const dueDateStr = toIsoDateString(c.paymentDueDate);
+    const daysRemaining = getDaysDiff(dueDateStr, todayStr);
+    const isOverdue = daysRemaining < 0;
+
+    if (isOverdue) {
+      curOverdueAmount += c.finalAmount;
+      curOverdueCount += 1;
+    } else {
+      curPendingAmount += c.finalAmount;
+      curPendingCount += 1;
+    }
+
+    if (selectedIdsSet.has(c.cycleId)) {
+      if (isOverdue) {
+        selOverdueAmount += c.finalAmount;
+        selOverdueCount += 1;
+      } else {
+        selPendingAmount += c.finalAmount;
+        selPendingCount += 1;
+      }
+    }
+  }
+
+  const curTotalOutstanding = Number((curOverdueAmount + curPendingAmount).toFixed(2));
+  const selTotalAmount = Number((selOverdueAmount + selPendingAmount).toFixed(2));
+
+  const afterOverdueAmount = Number(Math.max(0, curOverdueAmount - selOverdueAmount).toFixed(2));
+  const afterPendingAmount = Number(Math.max(0, curPendingAmount - selPendingAmount).toFixed(2));
+  const afterTotalOutstanding = Number((afterOverdueAmount + afterPendingAmount).toFixed(2));
+
+  const afterOverdueCount = Math.max(0, curOverdueCount - selOverdueCount);
+  const afterPendingCount = Math.max(0, curPendingCount - selPendingCount);
+
+  return {
+    current: {
+      overdueAmount: Number(curOverdueAmount.toFixed(2)),
+      pendingAmount: Number(curPendingAmount.toFixed(2)),
+      totalOutstanding: curTotalOutstanding,
+      overdueCycleCount: curOverdueCount,
+      pendingCycleCount: curPendingCount,
+    },
+    selectedTotals: {
+      amount: selTotalAmount,
+    },
+    afterPayment: {
+      overdueAmount: afterOverdueAmount,
+      pendingAmount: afterPendingAmount,
+      totalOutstanding: afterTotalOutstanding,
+      overdueCycleCount: afterOverdueCount,
+      pendingCycleCount: afterPendingCount,
+    },
+  };
+}
+
+// ── GET /payments/pending (Filtered Payment Cycles) ──
+const getPendingPayments = asyncHandler(async (req, res) => {
+  const { status, farmerId, date, dateFrom, dateTo, duration } = req.query;
+  const todayStr = toIsoDateString(new Date());
+
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
+
+  const filtered = unpaidCycles.filter((c) => {
+    const dueDateStr = toIsoDateString(c.paymentDueDate);
+    const daysRemaining = getDaysDiff(dueDateStr, todayStr);
+    const isOverdue = daysRemaining < 0;
+    const isDueToday = daysRemaining === 0;
+    const isUpcoming = daysRemaining > 0;
+
+    // Status filter
+    if (status) {
+      const s = String(status).toLowerCase();
+      if (s === 'overdue' && !isOverdue) return false;
+      if (s === 'due_today' && !isDueToday) return false;
+      if (s === 'upcoming' && !isUpcoming) return false;
+    }
+
+    // Farmer filter
+    if (farmerId) {
+      const pFarmerId = parsePositiveInteger(farmerId);
+      if (pFarmerId && c.farmerId !== pFarmerId) return false;
+    }
+
+    // Specific date filter
+    if (date) {
+      const parsedDate = parseValidDate(date);
+      if (parsedDate && dueDateStr !== toIsoDateString(parsedDate)) return false;
+    }
+
+    // Date range filter
+    if (dateFrom) {
+      const parsedFrom = parseValidDate(dateFrom);
+      if (parsedFrom && dueDateStr < toIsoDateString(parsedFrom)) return false;
+    }
+    if (dateTo) {
+      const parsedTo = parseValidDate(dateTo);
+      if (parsedTo && dueDateStr > toIsoDateString(parsedTo)) return false;
+    }
+
+    // Duration filter
+    if (duration) {
+      const pDur = Number(duration);
+      if ([15, 30].includes(pDur) && c.durationDays !== pDur) return false;
+    }
+
+    return true;
+  });
+
+  const formattedCycles = filtered.map((c) => {
+    const dueDateStr = toIsoDateString(c.paymentDueDate);
+    const daysRemaining = getDaysDiff(dueDateStr, todayStr);
+    return {
+      cycleId: c.cycleId,
+      farmerId: c.farmerId,
+      farmerName: c.farmerName,
+      farmerPhone: c.farmerPhone,
+      farmerStatus: c.farmerStatus,
+      startDate: toIsoDateString(c.startDate),
+      endDate: toIsoDateString(c.endDate),
+      durationDays: c.durationDays,
+      paymentDueDate: dueDateStr,
+      daysRemaining,
+      ratePerLiter: c.ratePerLiter,
+      totalLiters: c.totalLiters,
+      grossAmount: c.grossAmount,
+      feedDeduction: c.feedDeduction,
+      finalAmount: c.finalAmount,
+      status: c.status,
+      isOverdue: daysRemaining < 0,
+      isDueToday: daysRemaining === 0,
+    };
+  });
+
+  res.json({
+    success: true,
+    count: formattedCycles.length,
+    cycles: formattedCycles,
+  });
+});
+
+// ── GET /payments/financial-summary ──
+const getFinancialSummary = asyncHandler(async (req, res) => {
+  const todayStr = toIsoDateString(new Date());
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
+
+  const metrics = computeFinancialMetrics(unpaidCycles, new Set(), todayStr);
+
+  res.json({
+    success: true,
+    current: metrics.current,
+  });
+});
+
+// ── POST /payments/selected (Live Calculator with Simulation) ──
+const getSelectedPaymentsPreview = asyncHandler(async (req, res) => {
+  const { cycleIds } = req.body;
+
+  if (!cycleIds || !Array.isArray(cycleIds)) {
+    return res.status(400).json({
+      success: false,
+      message: 'cycleIds must be an array of cycle IDs (e.g. [1, 3, 7]).',
+    });
+  }
+
+  const todayStr = toIsoDateString(new Date());
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
+
+  const unpaidCyclesMap = new Map();
+  for (const c of unpaidCycles) {
+    unpaidCyclesMap.set(c.cycleId, c);
+  }
+
+  const selectedCycles = [];
+  const selectedFarmerIds = new Set();
+  const selectedIdsSet = new Set();
+
+  for (const rawId of cycleIds) {
+    const cycleId = parsePositiveInteger(rawId);
+    if (!cycleId) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid cycle ID: ${rawId}`,
+      });
+    }
+
+    const cycle = unpaidCyclesMap.get(cycleId);
+    if (!cycle) {
+      return res.status(400).json({
+        success: false,
+        message: `Cycle ID ${cycleId} not found or is already paid.`,
+      });
+    }
+
+    if (!selectedIdsSet.has(cycleId)) {
+      selectedIdsSet.add(cycleId);
+      selectedFarmerIds.add(cycle.farmerId);
+
+      const dueDateStr = toIsoDateString(cycle.paymentDueDate);
+      const daysRemaining = getDaysDiff(dueDateStr, todayStr);
+
+      selectedCycles.push({
+        cycleId: cycle.cycleId,
+        farmerId: cycle.farmerId,
+        farmerName: cycle.farmerName,
+        farmerPhone: cycle.farmerPhone,
+        startDate: toIsoDateString(cycle.startDate),
+        endDate: toIsoDateString(cycle.endDate),
+        paymentDueDate: dueDateStr,
+        durationDays: cycle.durationDays,
+        ratePerLiter: cycle.ratePerLiter,
+        totalLiters: cycle.totalLiters,
+        grossAmount: cycle.grossAmount,
+        feedDeduction: cycle.feedDeduction,
+        finalAmount: cycle.finalAmount,
+        status: cycle.status,
+        isOverdue: daysRemaining < 0,
+        isDueToday: daysRemaining === 0,
+        daysRemaining,
+      });
+    }
+  }
+
+  const metrics = computeFinancialMetrics(unpaidCycles, selectedIdsSet, todayStr);
+
+  res.json({
+    success: true,
+    selected: {
+      cycleCount: selectedCycles.length,
+      farmerCount: selectedFarmerIds.size,
+      amount: metrics.selectedTotals.amount,
+    },
+    selectedCycles,
+    current: metrics.current,
+    afterPayment: metrics.afterPayment,
+  });
+});
+
 // ── GET /payments/preview/:cycleId ──
 const getPaymentPreview = asyncHandler(async (req, res) => {
   const { cycleId } = req.params;
@@ -37,16 +288,16 @@ const getPaymentPreview = asyncHandler(async (req, res) => {
     },
     cycle: {
       id: cycle.id,
-      start_date: cycle.start_date,
-      end_date: cycle.end_date,
+      start_date: toIsoDateString(cycle.start_date),
+      end_date: toIsoDateString(cycle.end_date),
       duration_days: cycle.duration_days,
-      payment_due_date: cycle.payment_due_date,
+      payment_due_date: toIsoDateString(cycle.payment_due_date),
       rate_per_liter: cycle.rate_per_liter,
       status: cycle.status,
     },
-    start_date: cycle.start_date,
-    end_date: cycle.end_date,
-    payment_due_date: cycle.payment_due_date,
+    start_date: toIsoDateString(cycle.start_date),
+    end_date: toIsoDateString(cycle.end_date),
+    payment_due_date: toIsoDateString(cycle.payment_due_date),
     rate: Number(cycle.rate_per_liter),
     rate_per_liter: Number(cycle.rate_per_liter),
     total_liters: totalLiters,
@@ -62,30 +313,29 @@ const getUpcomingPayments = asyncHandler(async (req, res) => {
   const daysLimit = req.query.days ? parseInt(req.query.days, 10) : null;
   const todayStr = toIsoDateString(new Date());
 
-  const unpaidCycles = await cycleModel.getAllUnpaidCycles();
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
 
   const overdue = [];
   const dueToday = [];
   const upcoming = [];
 
   for (const cycle of unpaidCycles) {
-    const { totalLiters, grossAmount, feedDeduction, finalAmount } = await getCyclePaymentSummary(cycle, db);
-    const dueDateStr = toIsoDateString(cycle.payment_due_date);
+    const dueDateStr = toIsoDateString(cycle.paymentDueDate);
     const daysRemaining = getDaysDiff(dueDateStr, todayStr);
 
     const item = {
-      farmerId: cycle.farmer_id,
-      farmerName: cycle.farmer_name,
-      cycleId: cycle.id,
-      startDate: cycle.start_date,
-      endDate: cycle.end_date,
-      paymentDueDate: cycle.payment_due_date,
+      farmerId: cycle.farmerId,
+      farmerName: cycle.farmerName,
+      cycleId: cycle.cycleId,
+      startDate: toIsoDateString(cycle.startDate),
+      endDate: toIsoDateString(cycle.endDate),
+      paymentDueDate: dueDateStr,
       daysRemaining,
-      totalLiters,
-      ratePerLiter: Number(cycle.rate_per_liter),
-      grossAmount,
-      feedDeduction,
-      finalAmount,
+      totalLiters: cycle.totalLiters,
+      ratePerLiter: cycle.ratePerLiter,
+      grossAmount: cycle.grossAmount,
+      feedDeduction: cycle.feedDeduction,
+      finalAmount: cycle.finalAmount,
       status: cycle.status,
     };
 
@@ -112,7 +362,7 @@ const getUpcomingPayments = asyncHandler(async (req, res) => {
 // ── GET /payments/summary ──
 const getPaymentSummary = asyncHandler(async (req, res) => {
   const todayStr = toIsoDateString(new Date());
-  const unpaidCycles = await cycleModel.getAllUnpaidCycles();
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
 
   let farmersDueToday = 0;
   let amountDueToday = 0;
@@ -123,21 +373,20 @@ const getPaymentSummary = asyncHandler(async (req, res) => {
   let totalPendingPaymentAmount = 0;
 
   for (const cycle of unpaidCycles) {
-    const { finalAmount } = await getCyclePaymentSummary(cycle, db);
-    const dueDateStr = toIsoDateString(cycle.payment_due_date);
+    const dueDateStr = toIsoDateString(cycle.paymentDueDate);
     const daysRemaining = getDaysDiff(dueDateStr, todayStr);
 
-    totalPendingPaymentAmount += finalAmount;
+    totalPendingPaymentAmount += cycle.finalAmount;
 
     if (daysRemaining < 0) {
       overdueFarmers += 1;
-      overdueAmount += finalAmount;
+      overdueAmount += cycle.finalAmount;
     } else if (daysRemaining === 0) {
       farmersDueToday += 1;
-      amountDueToday += finalAmount;
+      amountDueToday += cycle.finalAmount;
     } else {
       upcomingPayments += 1;
-      upcomingAmount += finalAmount;
+      upcomingAmount += cycle.finalAmount;
     }
   }
 
@@ -150,67 +399,6 @@ const getPaymentSummary = asyncHandler(async (req, res) => {
     upcoming_payments: upcomingPayments,
     upcoming_amount: Number(upcomingAmount.toFixed(2)),
     total_pending_payment_amount: Number(totalPendingPaymentAmount.toFixed(2)),
-  });
-});
-
-// ── POST /payments/selected (Multi-farmer preview) ──
-const getSelectedPaymentsPreview = asyncHandler(async (req, res) => {
-  const { cycleIds } = req.body;
-
-  if (!Array.isArray(cycleIds) || cycleIds.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'cycleIds must be a non-empty array of cycle IDs.',
-    });
-  }
-
-  const selectedFarmers = [];
-  let totalAmount = 0;
-
-  for (const rawId of cycleIds) {
-    const cycleId = parsePositiveInteger(rawId);
-    if (!cycleId) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid cycle ID: ${rawId}`,
-      });
-    }
-
-    const cycle = await cycleModel.findCycleById(cycleId);
-    if (!cycle) {
-      return res.status(404).json({
-        success: false,
-        message: `Cycle ID ${cycleId} not found.`,
-      });
-    }
-
-    if (cycle.status === 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: `Cycle ID ${cycleId} (Farmer: ${cycle.farmer_name}) is already paid.`,
-      });
-    }
-
-    const { totalLiters, grossAmount, feedDeduction, finalAmount } = await getCyclePaymentSummary(cycle, db);
-    totalAmount += finalAmount;
-
-    selectedFarmers.push({
-      farmerId: cycle.farmer_id,
-      farmerName: cycle.farmer_name,
-      cycleId: cycle.id,
-      amount: finalAmount,
-      totalLiters,
-      ratePerLiter: Number(cycle.rate_per_liter),
-      grossAmount,
-      feedDeduction,
-      finalAmount,
-    });
-  }
-
-  res.json({
-    selectedFarmers,
-    farmerCount: selectedFarmers.length,
-    totalAmount: Number(totalAmount.toFixed(2)),
   });
 });
 
@@ -274,7 +462,7 @@ const paySelectedCycles = asyncHandler(async (req, res) => {
       }
     }
 
-    // 3. Process all calculations & records atomically
+    // 3. Process all calculations & records atomically (recalculated independently from DB)
     const paymentsCreated = [];
     let totalPaidSum = 0;
 
@@ -313,7 +501,8 @@ const paySelectedCycles = asyncHandler(async (req, res) => {
 
     res.status(201).json({
       success: true,
-      farmerCount: paymentsCreated.length,
+      farmerCount: new Set(paymentsCreated.map((p) => p.farmerId)).size,
+      cycleCount: paymentsCreated.length,
       totalAmount: Number(totalPaidSum.toFixed(2)),
       payments: paymentsCreated,
     });
@@ -412,10 +601,12 @@ const getPaymentsByFarmer = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getPendingPayments,
+  getFinancialSummary,
+  getSelectedPaymentsPreview,
   getPaymentPreview,
   getUpcomingPayments,
   getPaymentSummary,
-  getSelectedPaymentsPreview,
   paySelectedCycles,
   payCycle,
   getPaymentsByFarmer,
