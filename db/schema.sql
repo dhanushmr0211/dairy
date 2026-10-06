@@ -28,15 +28,14 @@ CREATE TABLE IF NOT EXISTS farmer_cycles (
     CONSTRAINT farmer_cycles_id_farmer_unique UNIQUE (id, farmer_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_farmer_one_active_cycle
-    ON farmer_cycles (farmer_id)
-    WHERE status IN ('active', 'pending_payment');
-
 CREATE INDEX IF NOT EXISTS idx_farmer_cycles_farmer_id_status
     ON farmer_cycles (farmer_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_farmer_cycles_status_due_date
     ON farmer_cycles (status, payment_due_date);
+
+CREATE INDEX IF NOT EXISTS idx_farmer_cycles_date_lookup
+    ON farmer_cycles (farmer_id, start_date, end_date);
 
 CREATE TABLE IF NOT EXISTS milk_entries (
     id BIGSERIAL PRIMARY KEY,

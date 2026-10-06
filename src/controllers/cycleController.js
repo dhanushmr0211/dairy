@@ -1,6 +1,8 @@
 const asyncHandler = require('../utils/asyncHandler');
 const cycleModel = require('../models/cycleModel');
 const farmerModel = require('../models/farmerModel');
+const { getCyclePaymentSummary } = require('../utils/paymentCalculator');
+const db = require('../config/db');
 const {
   parsePositiveInteger,
   parsePositiveNumber,
@@ -53,14 +55,29 @@ const startCycle = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Cannot start a cycle for an inactive farmer.' });
   }
 
-  const activeCycle = await cycleModel.findActiveCycleByFarmerId(parsedFarmerId);
-  if (activeCycle) {
-    return res.status(409).json({ success: false, message: 'Farmer already has an active payment cycle.' });
-  }
-
   const isoStartDate = toIsoDateString(parsedStartDate);
   const endDate = calculateEndDate(isoStartDate, durationNum);
-  
+
+  // Check for any overlapping cycles for this farmer
+  const overlappingCycle = await cycleModel.findOverlappingCycle({
+    farmerId: parsedFarmerId,
+    startDate: isoStartDate,
+    endDate,
+  });
+
+  if (overlappingCycle) {
+    return res.status(409).json({
+      success: false,
+      message: 'Cycle dates overlap with an existing cycle for this farmer.',
+      existingCycle: {
+        id: overlappingCycle.id,
+        startDate: toIsoDateString(overlappingCycle.start_date),
+        endDate: toIsoDateString(overlappingCycle.end_date),
+        status: overlappingCycle.status,
+      },
+    });
+  }
+
   let dueDate = endDate;
   if (paymentDueDate) {
     const parsedDueDate = parseValidDate(paymentDueDate);
@@ -79,7 +96,11 @@ const startCycle = asyncHandler(async (req, res) => {
     paymentDueDate: dueDate,
   });
 
-  res.status(201).json({ success: true, ...cycle });
+  res.status(201).json({
+    success: true,
+    ...cycle,
+    farmer_name: farmer.name,
+  });
 });
 
 const getActiveCycle = asyncHandler(async (req, res) => {
@@ -102,7 +123,53 @@ const getActiveCycle = asyncHandler(async (req, res) => {
   res.json({ success: true, ...cycle });
 });
 
+const getCyclesByFarmer = asyncHandler(async (req, res) => {
+  const { farmerId } = req.params;
+  const parsedFarmerId = parsePositiveInteger(farmerId);
+  if (!parsedFarmerId) {
+    return res.status(400).json({ success: false, message: 'farmerId must be a positive integer.' });
+  }
+
+  const farmer = await farmerModel.findFarmerById(parsedFarmerId);
+  if (!farmer) {
+    return res.status(404).json({ success: false, message: 'Farmer not found.' });
+  }
+
+  const cycles = await cycleModel.getCyclesByFarmerId(parsedFarmerId);
+  const detailedCycles = [];
+
+  for (const cycle of cycles) {
+    const { totalLiters, grossAmount, feedDeduction, finalAmount } = await getCyclePaymentSummary(cycle, db);
+    detailedCycles.push({
+      id: cycle.id,
+      cycleId: cycle.id,
+      farmerId: cycle.farmer_id,
+      farmerName: cycle.farmer_name,
+      startDate: toIsoDateString(cycle.start_date),
+      endDate: toIsoDateString(cycle.end_date),
+      durationDays: cycle.duration_days,
+      ratePerLiter: Number(cycle.rate_per_liter),
+      paymentDueDate: toIsoDateString(cycle.payment_due_date),
+      status: cycle.status,
+      totalLiters,
+      grossAmount,
+      feedDeduction,
+      finalAmount,
+      paymentStatus: cycle.status,
+      isPaid: cycle.status === 'paid',
+      createdAt: cycle.created_at,
+    });
+  }
+
+  res.json({
+    success: true,
+    farmer,
+    cycles: detailedCycles,
+  });
+});
+
 module.exports = {
   startCycle,
   getActiveCycle,
+  getCyclesByFarmer,
 };

@@ -1,19 +1,89 @@
 const db = require('../config/db');
 
+/**
+ * Find any cycle for the farmer that overlaps with [startDate, endDate].
+ * Overlap condition: existing.start_date <= new.end_date AND existing.end_date >= new.start_date
+ */
+async function findOverlappingCycle({ farmerId, startDate, endDate }, client = db) {
+  const result = await client.query(
+    `SELECT id, farmer_id, start_date, end_date, 
+            COALESCE(duration_days, (end_date - start_date + 1)) AS duration_days, 
+            rate_per_liter, 
+            COALESCE(payment_due_date, end_date) AS payment_due_date, 
+            status
+     FROM farmer_cycles
+     WHERE farmer_id = $1
+       AND start_date <= $3
+       AND end_date >= $2
+     LIMIT 1`,
+    [farmerId, startDate, endDate]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Find the cycle that contains a specific date for a farmer.
+ * Used for auto-attaching milk entries: milk_date BETWEEN cycle.start_date AND cycle.end_date
+ */
+async function findCycleByFarmerAndDate(farmerId, date, client = db) {
+  const result = await client.query(
+    `SELECT id, farmer_id, start_date, end_date, 
+            COALESCE(duration_days, (end_date - start_date + 1)) AS duration_days, 
+            rate_per_liter, 
+            COALESCE(payment_due_date, end_date) AS payment_due_date, 
+            status
+     FROM farmer_cycles
+     WHERE farmer_id = $1
+       AND start_date <= $2
+       AND end_date >= $2
+     LIMIT 1`,
+    [farmerId, date]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Find the most relevant active/unpaid cycle for a farmer (e.g. for default views).
+ */
 async function findActiveCycleByFarmerId(farmerId, client = db) {
   const result = await client.query(
     `SELECT id, farmer_id, start_date, end_date, 
-            COALESCE(duration_days, 15) AS duration_days, 
+            COALESCE(duration_days, (end_date - start_date + 1)) AS duration_days, 
             rate_per_liter, 
             COALESCE(payment_due_date, end_date) AS payment_due_date, 
             status, created_at
      FROM farmer_cycles
      WHERE farmer_id = $1 AND (status IS NULL OR status != 'paid')
+     ORDER BY start_date DESC, id DESC
      LIMIT 1`,
     [farmerId]
   );
 
   return result.rows[0] || null;
+}
+
+/**
+ * Get ALL cycles for a farmer sorted by start_date DESC.
+ */
+async function getCyclesByFarmerId(farmerId, client = db) {
+  const result = await client.query(
+    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
+            COALESCE(c.duration_days, (c.end_date - c.start_date + 1)) AS duration_days, 
+            c.rate_per_liter, 
+            COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
+            c.status, c.created_at,
+            f.name AS farmer_name, f.phone AS farmer_phone, 
+            COALESCE(f.status, 'active') AS farmer_status
+     FROM farmer_cycles c
+     INNER JOIN farmers f ON f.id = c.farmer_id
+     WHERE c.farmer_id = $1
+     ORDER BY c.start_date DESC, c.id DESC`,
+    [farmerId]
+  );
+
+  return result.rows;
 }
 
 async function createCycle({
@@ -39,7 +109,7 @@ async function createCycle({
 async function findCycleById(cycleId, client = db) {
   const result = await client.query(
     `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
-            COALESCE(c.duration_days, 15) AS duration_days, 
+            COALESCE(c.duration_days, (c.end_date - c.start_date + 1)) AS duration_days, 
             c.rate_per_liter, 
             COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
             c.status, c.created_at,
@@ -58,7 +128,7 @@ async function findCycleById(cycleId, client = db) {
 async function findCycleByIdForUpdate(cycleId, client = db) {
   const result = await client.query(
     `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
-            COALESCE(c.duration_days, 15) AS duration_days, 
+            COALESCE(c.duration_days, (c.end_date - c.start_date + 1)) AS duration_days, 
             c.rate_per_liter, 
             COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
             c.status,
@@ -77,7 +147,7 @@ async function findCyclesByIdsForUpdate(cycleIds, client = db) {
   if (!cycleIds || cycleIds.length === 0) return [];
   const result = await client.query(
     `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
-            COALESCE(c.duration_days, 15) AS duration_days, 
+            COALESCE(c.duration_days, (c.end_date - c.start_date + 1)) AS duration_days, 
             c.rate_per_liter, 
             COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
             c.status,
@@ -143,7 +213,10 @@ async function getActiveCycleCount(client = db) {
 }
 
 module.exports = {
+  findOverlappingCycle,
+  findCycleByFarmerAndDate,
   findActiveCycleByFarmerId,
+  getCyclesByFarmerId,
   createCycle,
   findCycleById,
   findCycleByIdForUpdate,

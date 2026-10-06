@@ -55,31 +55,32 @@ const addMilkEntry = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Cannot add milk entry for an inactive farmer.' });
   }
 
-  const activeCycle = await cycleModel.findActiveCycleByFarmerId(parsedFarmerId);
-  if (!activeCycle) {
-    return res.status(404).json({ success: false, message: 'No active cycle found for this farmer.' });
-  }
+  const isoDate = toIsoDateString(parsedDate);
 
-  const cycleStart = toDateOnlyTimeValue(activeCycle.start_date);
-  const cycleEnd = toDateOnlyTimeValue(activeCycle.end_date);
-
-  if (entryTimeValue < cycleStart || entryTimeValue > cycleEnd) {
+  // Find the exact cycle whose date range contains this milk entry date:
+  // milk_date >= cycle.start_date AND milk_date <= cycle.end_date
+  const matchingCycle = await cycleModel.findCycleByFarmerAndDate(parsedFarmerId, isoDate);
+  if (!matchingCycle) {
     return res.status(400).json({
       success: false,
-      message: 'Milk entry date must be within the active cycle date range.',
+      message: 'No payment cycle exists for this farmer on this date.',
     });
   }
 
-  const isoDate = toIsoDateString(parsedDate);
   const entry = await milkModel.createMilkEntry({
     farmerId: parsedFarmerId,
-    cycleId: activeCycle.id,
+    cycleId: matchingCycle.id,
     date: isoDate,
     time: normalizedTime,
     liters: parsedLiters,
   });
 
-  res.status(201).json({ success: true, ...entry });
+  res.status(201).json({
+    success: true,
+    ...entry,
+    cycle_id: matchingCycle.id,
+    rate_per_liter: matchingCycle.rate_per_liter,
+  });
 });
 
 const getMilkByFarmer = asyncHandler(async (req, res) => {
