@@ -1,320 +1,233 @@
 # Dairy Management System Backend
 
-Node.js + Express + PostgreSQL (Neon DB) backend for managing:
-- Farmers
-- Milk billing cycles
-- Milk entries
-- Feed records
-- Cycle payments
+Production-ready Node.js + Express + PostgreSQL (Neon DB) backend for comprehensive dairy management:
+- 👨‍🌾 **Farmer Management:** Active/inactive status lifecycle, registrations, summaries
+- 🔄 **Payment Cycles:** 15-day and 30-day billing periods, flexible rates per liter, payment due dates
+- 🥛 **Milk Collection:** Automatic association with active cycles, shift validation (morning/evening), date constraints
+- 🌾 **Feed & Supplies Deduction:** Automatic deduction for feed records within the cycle date window
+- 💳 **Cycle Payments & Settlements:** Single & atomic multi-farmer settlements, payout previews, upcoming/due/overdue queues, complete payment history
+- 📊 **Main Dashboard:** Real-time metrics across collections, shift-level totals, and pending dues
 
-## 1) SQL Queries for Neon DB
+---
 
-Run `/db/schema.sql` in your Neon PostgreSQL database.
+## 1. Database Setup & Migrations (Neon DB)
+
+### Initial Setup
+Run `/db/schema.sql` in your Neon PostgreSQL database SQL Editor.
+
+### Existing Database Migration
+If updating an existing database, execute `/db/migrations/001_payment_cycles_and_farmer_status.sql`:
 
 ```sql
-CREATE TABLE IF NOT EXISTS farmers (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(120) NOT NULL,
-    phone VARCHAR(20) NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- 1. Add status to farmers
+ALTER TABLE farmers 
+ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'active' 
+CHECK (status IN ('active', 'inactive'));
 
-CREATE TABLE IF NOT EXISTS farmer_cycles (
-    id BIGSERIAL PRIMARY KEY,
-    farmer_id BIGINT NOT NULL REFERENCES farmers(id) ON DELETE CASCADE,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    rate_per_liter NUMERIC(10,2) NOT NULL CHECK (rate_per_liter > 0),
-    status VARCHAR(10) NOT NULL CHECK (status IN ('active', 'paid')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT cycle_date_range_check CHECK (end_date >= start_date),
-    CONSTRAINT farmer_cycles_id_farmer_unique UNIQUE (id, farmer_id)
-);
+CREATE INDEX IF NOT EXISTS idx_farmers_status ON farmers (status);
 
+-- 2. Add duration_days and payment_due_date to farmer_cycles
+ALTER TABLE farmer_cycles 
+ADD COLUMN IF NOT EXISTS duration_days INT DEFAULT 15 CHECK (duration_days IN (15, 30));
+
+UPDATE farmer_cycles 
+SET duration_days = CASE 
+    WHEN (end_date - start_date + 1) >= 28 THEN 30 
+    ELSE 15 
+END 
+WHERE duration_days IS NULL;
+
+ALTER TABLE farmer_cycles 
+ADD COLUMN IF NOT EXISTS payment_due_date DATE;
+
+UPDATE farmer_cycles 
+SET payment_due_date = end_date 
+WHERE payment_due_date IS NULL;
+
+-- 3. Expand farmer_cycles status constraint to support ('active', 'pending_payment', 'paid')
+ALTER TABLE farmer_cycles ALTER COLUMN status TYPE VARCHAR(20);
+
+ALTER TABLE farmer_cycles DROP CONSTRAINT IF EXISTS farmer_cycles_status_check;
+ALTER TABLE farmer_cycles ADD CONSTRAINT farmer_cycles_status_check CHECK (status IN ('active', 'pending_payment', 'paid'));
+
+-- 4. Update partial unique index to allow only ONE active/pending_payment cycle per farmer
+DROP INDEX IF EXISTS idx_farmer_one_active_cycle;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_farmer_one_active_cycle
     ON farmer_cycles (farmer_id)
-    WHERE status = 'active';
+    WHERE status IN ('active', 'pending_payment');
 
-CREATE INDEX IF NOT EXISTS idx_farmer_cycles_farmer_id_status
-    ON farmer_cycles (farmer_id, status);
-
-CREATE TABLE IF NOT EXISTS milk_entries (
-    id BIGSERIAL PRIMARY KEY,
-    farmer_id BIGINT NOT NULL,
-    cycle_id BIGINT NOT NULL,
-    date DATE NOT NULL,
-    time VARCHAR(10) NOT NULL CHECK (time IN ('morning', 'evening')),
-    liters NUMERIC(10,2) NOT NULL CHECK (liters > 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT milk_entries_farmer_fk FOREIGN KEY (farmer_id) REFERENCES farmers(id) ON DELETE CASCADE,
-    CONSTRAINT milk_entries_cycle_farmer_fk FOREIGN KEY (cycle_id, farmer_id) REFERENCES farmer_cycles(id, farmer_id) ON DELETE CASCADE,
-    CONSTRAINT milk_unique_farmer_shift UNIQUE (farmer_id, date, time)
-);
-
-CREATE INDEX IF NOT EXISTS idx_milk_entries_farmer_date
-    ON milk_entries (farmer_id, date);
-
-CREATE INDEX IF NOT EXISTS idx_milk_entries_cycle_id
-    ON milk_entries (cycle_id);
-
-CREATE TABLE IF NOT EXISTS feed_records (
-    id BIGSERIAL PRIMARY KEY,
-    farmer_id BIGINT NOT NULL REFERENCES farmers(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    item VARCHAR(100) NOT NULL,
-    quantity NUMERIC(10,2) NOT NULL CHECK (quantity >= 0),
-    amount NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_feed_records_farmer_date
-    ON feed_records (farmer_id, date);
-
-CREATE TABLE IF NOT EXISTS payments (
-    id BIGSERIAL PRIMARY KEY,
-    cycle_id BIGINT NOT NULL UNIQUE REFERENCES farmer_cycles(id) ON DELETE CASCADE,
-    total_liters NUMERIC(12,2) NOT NULL CHECK (total_liters >= 0),
-    total_amount NUMERIC(12,2) NOT NULL CHECK (total_amount >= 0),
-    feed_deduction NUMERIC(12,2) NOT NULL CHECK (feed_deduction >= 0),
-    final_amount NUMERIC(12,2) NOT NULL,
-    paid_date DATE NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_payments_paid_date
-    ON payments (paid_date);
+-- 5. Additional index for due dates and statuses
+CREATE INDEX IF NOT EXISTS idx_farmer_cycles_status_due_date
+    ON farmer_cycles (status, payment_due_date);
 ```
 
-## 2) Backend Project Structure
+---
 
-```text
-dairy/
-├── db/
-│   └── schema.sql
-├── src/
-│   ├── config/
-│   │   └── db.js
-│   ├── controllers/
-│   │   ├── cycleController.js
-│   │   ├── farmerController.js
-│   │   ├── feedController.js
-│   │   ├── milkController.js
-│   │   └── paymentController.js
-│   ├── middleware/
-│   │   ├── errorHandler.js
-│   │   └── rateLimiter.js
-│   ├── models/
-│   │   ├── cycleModel.js
-│   │   ├── farmerModel.js
-│   │   ├── feedModel.js
-│   │   ├── milkModel.js
-│   │   └── paymentModel.js
-│   ├── routes/
-│   │   ├── cycleRoutes.js
-│   │   ├── farmerRoutes.js
-│   │   ├── feedRoutes.js
-│   │   ├── milkRoutes.js
-│   │   └── paymentRoutes.js
-│   ├── utils/
-│   │   └── asyncHandler.js
-│   ├── app.js
-│   └── server.js
-├── .env.example
-├── package.json
-└── README.md
-```
+## 2. Environment Variables
 
-## 3) Setup
+Create a `.env` file from `.env.example`:
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `PORT` | HTTP server port | `5000` |
+| `DATABASE_URL` | Neon PostgreSQL connection string (SSL required) | `postgresql://user:pass@ep-xyz.us-east-2.aws.neon.tech/dairy?sslmode=require` |
+| `NODE_ENV` | Environment mode | `production` or `development` |
+| `CORS_ORIGIN` | Allowed CORS origins (comma-separated or `*`) | `https://dairy-beta-one.vercel.app,http://localhost:5173` |
+
+---
+
+## 3. Local Development
 
 ```bash
+# 1. Install dependencies
 npm install
+
+# 2. Configure environment
 cp .env.example .env
-# set DATABASE_URL in .env
+# Edit .env and supply your Neon DATABASE_URL
+
+# 3. Start development server (with nodemon auto-restart)
 npm run dev
+
+# 4. Or start production server
+npm start
 ```
 
-## 4) REST API Endpoints
+---
 
-### Farmers
-- `POST /farmers` - Add farmer
-- `GET /farmers` - List all farmers
+## 4. REST API Reference
 
-### Cycles
-- `POST /cycles/start` - Start new cycle with duration and rate
-- `GET /cycles/active/:farmerId` - Get active cycle
+### 🏥 System Health
+- **`GET /health`**  
+  *Response:* `{"status": "ok"}`
 
-### Milk
-- `POST /milk` - Add milk entry (auto attaches to active cycle)
-- `GET /milk/:farmerId` - Get milk entries
+---
 
-### Feed
-- `POST /feed` - Add feed record
-- `GET /feed/:farmerId` - Get feed records
+### 👨‍🌾 Farmers
+- **`POST /farmers`** — Register a new farmer
+  ```json
+  // Request
+  { "name": "Ramesh", "phone": "9876543210", "status": "active" }
+  ```
+- **`GET /farmers`** — List all farmers (optional query: `?status=active` or `?status=inactive`)
+- **`GET /farmers/:id/summary`** — Full summary of farmer's active cycle, total milk, feed deductions, and net payout
+- **`PATCH /farmers/:id/status`** — Update farmer status (`active` / `inactive`)
+  ```json
+  // Request
+  { "status": "inactive" }
+  ```
 
-### Payments
-- `POST /payments/pay` - Mark cycle as paid and calculate totals
-- `GET /payments/:farmerId` - Get farmer payment history
+---
 
-## 5) Example Request/Response JSON
+### 🔄 Cycles
+- **`POST /cycles/start`** — Start a 15 or 30-day billing cycle
+  ```json
+  // Request
+  {
+    "farmerId": 1,
+    "startDate": "2026-10-01",
+    "durationDays": 15,
+    "ratePerLiter": 42.50,
+    "paymentDueDate": "2026-10-15" // optional, defaults to end date
+  }
+  ```
+- **`GET /cycles/active/:farmerId`** — Get the current active/pending cycle for a farmer
 
-### Add Farmer
-**POST** `/farmers`
+---
 
-Request:
-```json
-{
-  "name": "Ramesh",
-  "phone": "9876543210"
-}
-```
+### 🥛 Milk Entries
+- **`POST /milk`** — Record daily morning or evening milk entry (automatically attached to active cycle)
+  ```json
+  // Request
+  {
+    "farmerId": 1,
+    "date": "2026-10-02",
+    "time": "morning", // "morning" or "evening"
+    "liters": 12.50
+  }
+  ```
+- **`GET /milk/:farmerId`** — List all milk records for a farmer
 
-Response:
-```json
-{
-  "id": 1,
-  "name": "Ramesh",
-  "phone": "9876543210"
-}
-```
+---
 
-### Start Cycle
-**POST** `/cycles/start`
+### 🌾 Feed & Supplies
+- **`POST /feed`** — Record feed/supply issued to a farmer
+  ```json
+  // Request
+  {
+    "farmerId": 1,
+    "date": "2026-10-03",
+    "item": "Cattle Feed (50kg)",
+    "quantity": 1,
+    "amount": 750.00
+  }
+  ```
+- **`GET /feed/:farmerId`** — List all feed purchase records for a farmer
 
-Request:
-```json
-{
-  "farmerId": 1,
-  "startDate": "2026-10-01",
-  "durationDays": 15,
-  "ratePerLiter": 42.5
-}
-```
+---
 
-Response:
-```json
-{
-  "id": 1,
-  "farmer_id": "1",
-  "start_date": "2026-10-01T00:00:00.000Z",
-  "end_date": "2026-10-15T00:00:00.000Z",
-  "rate_per_liter": "42.50",
-  "status": "active"
-}
-```
+### 💳 Payments & Settlements
+- **`GET /payments/preview/:cycleId`** — Preview calculation for a specific cycle without marking it paid
+- **`GET /payments/upcoming`** — List unpaid cycles categorized into `overdue`, `due_today`, and `upcoming` (optional: `?days=7`)
+- **`GET /payments/summary`** — Summary metrics (farmers due today, overdue count/amount, upcoming count/amount, total pending dues)
+- **`POST /payments/selected`** — Preview multi-farmer settlement totals before payment
+  ```json
+  // Request
+  { "cycleIds": [1, 2, 3] }
+  ```
+- **`POST /payments/pay-selected`** — Atomically settle multiple selected cycles in a single PostgreSQL transaction
+  ```json
+  // Request
+  {
+    "cycleIds": [1, 2, 3],
+    "paidDate": "2026-10-15"
+  }
+  ```
+- **`POST /payments/pay`** — Settle a single cycle
+  ```json
+  // Request
+  {
+    "cycleId": 1,
+    "paidDate": "2026-10-15"
+  }
+  ```
+- **`GET /payments/:farmerId`** — Complete historical payments for a farmer (newest first)
 
-### Add Milk Entry
-**POST** `/milk`
+---
 
-Request:
-```json
-{
-  "farmerId": 1,
-  "date": "2026-10-02",
-  "time": "morning",
-  "liters": 12.5
-}
-```
+### 📊 Main Dashboard
+- **`GET /dashboard`** — Real-time metrics
+  ```json
+  // Response
+  {
+    "success": true,
+    "active_farmer_count": 12,
+    "today_morning_milk": 140.50,
+    "today_evening_milk": 115.00,
+    "today_total_milk": 255.50,
+    "farmers_due_today": 2,
+    "amount_due_today": 12500.00,
+    "overdue_farmers": 1,
+    "overdue_amount": 6200.00,
+    "upcoming_payment_count": 9,
+    "upcoming_payment_amount": 54000.00,
+    "total_pending_payment_amount": 72700.00,
+    "active_cycles_count": 12
+  }
+  ```
 
-Response:
-```json
-{
-  "id": 1,
-  "farmer_id": "1",
-  "cycle_id": "1",
-  "date": "2026-10-02T00:00:00.000Z",
-  "time": "morning",
-  "liters": "12.50"
-}
-```
+---
 
-### Add Feed Record
-**POST** `/feed`
+## 5. Render Deployment Instructions
 
-Request:
-```json
-{
-  "farmerId": 1,
-  "date": "2026-10-03",
-  "item": "Cattle Feed",
-  "quantity": 25,
-  "amount": 750
-}
-```
-
-Response:
-```json
-{
-  "id": 1,
-  "farmer_id": "1",
-  "date": "2026-10-03T00:00:00.000Z",
-  "item": "Cattle Feed",
-  "quantity": "25.00",
-  "amount": "750.00"
-}
-```
-
-### Pay Cycle
-**POST** `/payments/pay`
-
-Request:
-```json
-{
-  "cycleId": 1,
-  "paidDate": "2026-10-15"
-}
-```
-
-Response:
-```json
-{
-  "id": 1,
-  "cycle_id": "1",
-  "total_liters": "160.00",
-  "total_amount": "6800.00",
-  "feed_deduction": "750.00",
-  "final_amount": "6050.00",
-  "paid_date": "2026-10-15T00:00:00.000Z"
-}
-```
-
-## 6) Business Logic Implemented
-
-- Total Milk = `SUM(liters)` per cycle
-- Total Amount = `total_liters × rate_per_liter`
-- Final Amount = `total_amount - feed_deduction`
-- Milk entry stores no rate and uses active cycle automatically
-- Only one active cycle per farmer enforced by partial unique index
-
-## 7) New/Updated APIs
-
-- `GET /payments/preview/:cycleId` - Preview cycle payout before payment
-- `GET /farmers/:id/summary` - Active cycle + computed payout summary
-- `GET /dashboard` - Overall dashboard stats (farmers, milk today, active/unpaid cycles, expected payout)
-
-## 8) Production Readiness Improvements
-
-- Feed deduction is calculated only for feed records between `cycle.start_date` and `cycle.end_date`
-- Cycle payment is processed in a DB transaction with row locking
-- Guards added for:
-  - no active cycle milk entry
-  - duplicate active cycle creation
-  - already paid cycle payment attempts
-- Added global + payment-specific rate limiting
-- Added request logging with `morgan`
-- Added CORS configuration (`CORS_ORIGIN`)
-- Added aggregation-focused indexes:
-  - `idx_milk_entries_date`
-  - `idx_farmer_cycles_status`
-
-## 9) Render Deployment Steps
-
-1. Create a new Web Service in Render from this repository.
-2. Set **Build Command**: `npm install`
-3. Set **Start Command**: `npm start`
-4. Add environment variables:
-   - `NODE_ENV=production`
-   - `PORT=10000` (Render provides this automatically; app uses `process.env.PORT`)
-   - `DATABASE_URL=<your_neon_connection_string>`
-   - `CORS_ORIGIN=<frontend_url>`
-5. Ensure Neon DB has schema applied from `db/schema.sql`.
-6. Deploy and verify `GET /health`.
+1. Push this repository to GitHub.
+2. In Render:
+   - Create a **Web Service** and connect your repository.
+   - **Environment:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npm start`
+3. Add the following **Environment Variables** in Render:
+   - `NODE_ENV` = `production`
+   - `DATABASE_URL` = `your_neon_postgres_connection_string`
+   - `CORS_ORIGIN` = `https://dairy-beta-one.vercel.app` (do not add trailing slashes)
+4. Deploy and verify at `https://<your-render-subdomain>.onrender.com/health`.

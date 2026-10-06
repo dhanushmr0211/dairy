@@ -1,17 +1,28 @@
+-- ==========================================================
+-- Complete PostgreSQL Schema for Dairy Management System
+-- Neon DB Compatible
+-- ==========================================================
+
 CREATE TABLE IF NOT EXISTS farmers (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(120) NOT NULL,
     phone VARCHAR(20) NOT NULL UNIQUE,
+    status VARCHAR(10) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_farmers_status
+    ON farmers (status);
 
 CREATE TABLE IF NOT EXISTS farmer_cycles (
     id BIGSERIAL PRIMARY KEY,
     farmer_id BIGINT NOT NULL REFERENCES farmers(id) ON DELETE CASCADE,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
+    duration_days INT NOT NULL DEFAULT 15 CHECK (duration_days IN (15, 30)),
     rate_per_liter NUMERIC(10,2) NOT NULL CHECK (rate_per_liter > 0),
-    status VARCHAR(10) NOT NULL CHECK (status IN ('active', 'paid')),
+    payment_due_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending_payment', 'paid')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT cycle_date_range_check CHECK (end_date >= start_date),
     CONSTRAINT farmer_cycles_id_farmer_unique UNIQUE (id, farmer_id)
@@ -19,10 +30,13 @@ CREATE TABLE IF NOT EXISTS farmer_cycles (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_farmer_one_active_cycle
     ON farmer_cycles (farmer_id)
-    WHERE status = 'active';
+    WHERE status IN ('active', 'pending_payment');
 
 CREATE INDEX IF NOT EXISTS idx_farmer_cycles_farmer_id_status
     ON farmer_cycles (farmer_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_farmer_cycles_status_due_date
+    ON farmer_cycles (status, payment_due_date);
 
 CREATE TABLE IF NOT EXISTS milk_entries (
     id BIGSERIAL PRIMARY KEY,
@@ -59,16 +73,13 @@ CREATE TABLE IF NOT EXISTS feed_records (
 CREATE INDEX IF NOT EXISTS idx_feed_records_farmer_date
     ON feed_records (farmer_id, date);
 
-CREATE INDEX IF NOT EXISTS idx_farmer_cycles_status
-    ON farmer_cycles (status);
-
 CREATE TABLE IF NOT EXISTS payments (
     id BIGSERIAL PRIMARY KEY,
     cycle_id BIGINT NOT NULL UNIQUE REFERENCES farmer_cycles(id) ON DELETE CASCADE,
     total_liters NUMERIC(12,2) NOT NULL CHECK (total_liters >= 0),
     total_amount NUMERIC(12,2) NOT NULL CHECK (total_amount >= 0),
     feed_deduction NUMERIC(12,2) NOT NULL CHECK (feed_deduction >= 0),
-    final_amount NUMERIC(12,2) NOT NULL,
+    final_amount NUMERIC(12,2) NOT NULL CHECK (final_amount >= 0),
     paid_date DATE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

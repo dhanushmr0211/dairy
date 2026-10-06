@@ -7,7 +7,7 @@ async function createPayment(
   const result = await client.query(
     `INSERT INTO payments (cycle_id, total_liters, total_amount, feed_deduction, final_amount, paid_date)
      VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, cycle_id, total_liters, total_amount, feed_deduction, final_amount, paid_date`,
+     RETURNING id, cycle_id, total_liters, total_amount, feed_deduction, final_amount, paid_date, created_at`,
     [cycleId, totalLiters, totalAmount, feedDeduction, finalAmount, paidDate]
   );
 
@@ -16,7 +16,7 @@ async function createPayment(
 
 async function findPaymentByCycleId(cycleId, client = db) {
   const result = await client.query(
-    `SELECT id, cycle_id, total_liters, total_amount, feed_deduction, final_amount, paid_date
+    `SELECT id, cycle_id, total_liters, total_amount, feed_deduction, final_amount, paid_date, created_at
      FROM payments
      WHERE cycle_id = $1
      LIMIT 1`,
@@ -31,11 +31,16 @@ async function getPaymentsByFarmerId(farmerId) {
     `SELECT p.id,
             p.cycle_id,
             c.farmer_id,
+            c.start_date,
+            c.end_date,
+            c.duration_days,
+            c.rate_per_liter,
             p.total_liters,
-            p.total_amount,
+            p.total_amount AS gross_amount,
             p.feed_deduction,
             p.final_amount,
-            p.paid_date
+            p.paid_date,
+            p.created_at
      FROM payments p
      INNER JOIN farmer_cycles c ON c.id = p.cycle_id
      WHERE c.farmer_id = $1
