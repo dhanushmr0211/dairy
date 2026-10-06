@@ -12,12 +12,16 @@ async function createFarmer({ name, phone, status = 'active' }) {
 }
 
 async function getAllFarmers({ status } = {}) {
-  let query = `SELECT id, name, phone, status, created_at FROM farmers`;
+  let query = `SELECT id, name, phone, COALESCE(status, 'active') AS status, created_at FROM farmers`;
   const params = [];
 
   if (status) {
-    query += ` WHERE status = $1`;
-    params.push(status);
+    if (status === 'active') {
+      query += ` WHERE (status IS NULL OR status = 'active')`;
+    } else {
+      query += ` WHERE status = $1`;
+      params.push(status);
+    }
   }
 
   query += ` ORDER BY id ASC`;
@@ -27,7 +31,7 @@ async function getAllFarmers({ status } = {}) {
 
 async function findFarmerById(farmerId) {
   const result = await db.query(
-    `SELECT id, name, phone, status, created_at
+    `SELECT id, name, phone, COALESCE(status, 'active') AS status, created_at
      FROM farmers
      WHERE id = $1
      LIMIT 1`,
@@ -51,7 +55,7 @@ async function updateFarmerStatus(farmerId, status) {
 
 async function getActiveFarmersCount(client = db) {
   const result = await client.query(
-    `SELECT COUNT(*)::INT AS active_farmers FROM farmers WHERE status = 'active'`
+    `SELECT COUNT(*)::INT AS active_farmers FROM farmers WHERE (status IS NULL OR status = 'active')`
   );
   return Number(result.rows[0].active_farmers);
 }

@@ -2,9 +2,13 @@ const db = require('../config/db');
 
 async function findActiveCycleByFarmerId(farmerId, client = db) {
   const result = await client.query(
-    `SELECT id, farmer_id, start_date, end_date, duration_days, rate_per_liter, payment_due_date, status, created_at
+    `SELECT id, farmer_id, start_date, end_date, 
+            COALESCE(duration_days, 15) AS duration_days, 
+            rate_per_liter, 
+            COALESCE(payment_due_date, end_date) AS payment_due_date, 
+            status, created_at
      FROM farmer_cycles
-     WHERE farmer_id = $1 AND status IN ('active', 'pending_payment')
+     WHERE farmer_id = $1 AND (status IS NULL OR status != 'paid')
      LIMIT 1`,
     [farmerId]
   );
@@ -34,8 +38,13 @@ async function createCycle({
 
 async function findCycleById(cycleId, client = db) {
   const result = await client.query(
-    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, c.duration_days, c.rate_per_liter, c.payment_due_date, c.status, c.created_at,
-            f.name AS farmer_name, f.phone AS farmer_phone, f.status AS farmer_status
+    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
+            COALESCE(c.duration_days, 15) AS duration_days, 
+            c.rate_per_liter, 
+            COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
+            c.status, c.created_at,
+            f.name AS farmer_name, f.phone AS farmer_phone, 
+            COALESCE(f.status, 'active') AS farmer_status
      FROM farmer_cycles c
      INNER JOIN farmers f ON f.id = c.farmer_id
      WHERE c.id = $1
@@ -48,7 +57,11 @@ async function findCycleById(cycleId, client = db) {
 
 async function findCycleByIdForUpdate(cycleId, client = db) {
   const result = await client.query(
-    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, c.duration_days, c.rate_per_liter, c.payment_due_date, c.status,
+    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
+            COALESCE(c.duration_days, 15) AS duration_days, 
+            c.rate_per_liter, 
+            COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
+            c.status,
             f.name AS farmer_name, f.phone AS farmer_phone
      FROM farmer_cycles c
      INNER JOIN farmers f ON f.id = c.farmer_id
@@ -63,7 +76,11 @@ async function findCycleByIdForUpdate(cycleId, client = db) {
 async function findCyclesByIdsForUpdate(cycleIds, client = db) {
   if (!cycleIds || cycleIds.length === 0) return [];
   const result = await client.query(
-    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, c.duration_days, c.rate_per_liter, c.payment_due_date, c.status,
+    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
+            COALESCE(c.duration_days, 15) AS duration_days, 
+            c.rate_per_liter, 
+            COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
+            c.status,
             f.name AS farmer_name, f.phone AS farmer_phone
      FROM farmer_cycles c
      INNER JOIN farmers f ON f.id = c.farmer_id
@@ -99,12 +116,17 @@ async function updateCycleStatus(cycleId, status, client = db) {
 
 async function getAllUnpaidCycles(client = db) {
   const result = await client.query(
-    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, c.duration_days, c.rate_per_liter, c.payment_due_date, c.status,
-            f.name AS farmer_name, f.phone AS farmer_phone, f.status AS farmer_status
+    `SELECT c.id, c.farmer_id, c.start_date, c.end_date, 
+            COALESCE(c.duration_days, (c.end_date - c.start_date + 1)) AS duration_days, 
+            c.rate_per_liter, 
+            COALESCE(c.payment_due_date, c.end_date) AS payment_due_date, 
+            c.status,
+            f.name AS farmer_name, f.phone AS farmer_phone, 
+            COALESCE(f.status, 'active') AS farmer_status
      FROM farmer_cycles c
      INNER JOIN farmers f ON f.id = c.farmer_id
-     WHERE c.status IN ('active', 'pending_payment')
-     ORDER BY c.payment_due_date ASC, c.id ASC`
+     WHERE c.status IS NULL OR c.status != 'paid'
+     ORDER BY COALESCE(c.payment_due_date, c.end_date) ASC, c.id ASC`
   );
 
   return result.rows;
@@ -114,7 +136,7 @@ async function getActiveCycleCount(client = db) {
   const result = await client.query(
     `SELECT COUNT(*)::INT AS active_cycles
      FROM farmer_cycles
-     WHERE status IN ('active', 'pending_payment')`
+     WHERE status IS NULL OR status != 'paid'`
   );
 
   return Number(result.rows[0].active_cycles);

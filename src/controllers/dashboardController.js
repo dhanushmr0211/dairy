@@ -21,6 +21,7 @@ const getDashboard = asyncHandler(async (req, res) => {
 
     const [
       activeFarmerCount,
+      totalFarmerCount,
       morningMilk,
       eveningMilk,
       totalMilkToday,
@@ -28,6 +29,7 @@ const getDashboard = asyncHandler(async (req, res) => {
       unpaidCycles,
     ] = await Promise.all([
       farmerModel.getActiveFarmersCount(client),
+      farmerModel.getTotalFarmersCount(client),
       milkModel.getTodayMorningMilk(client),
       milkModel.getTodayEveningMilk(client),
       milkModel.getTodayMilkTotal(client),
@@ -43,39 +45,69 @@ const getDashboard = asyncHandler(async (req, res) => {
     let upcomingPaymentAmount = 0;
     let totalPendingPaymentAmount = 0;
 
+    const farmerCyclesSummary = [];
+
     for (const cycle of unpaidCycles) {
-      const { finalAmount } = await getCyclePaymentSummary(cycle, client);
-      const dueDateStr = toIsoDateString(cycle.payment_due_date);
+      const { totalLiters, grossAmount, feedDeduction, finalAmount } = await getCyclePaymentSummary(cycle, client);
+      const dueDateStr = toIsoDateString(cycle.payment_due_date || cycle.end_date);
       const daysRemaining = getDaysDiff(dueDateStr, todayStr);
 
       totalPendingPaymentAmount += finalAmount;
 
-      if (daysRemaining < 0) {
+      const isOverdue = daysRemaining < 0;
+      const isDueToday = daysRemaining === 0;
+
+      if (isOverdue) {
         overdueFarmers += 1;
         overdueAmount += finalAmount;
-      } else if (daysRemaining === 0) {
+      } else if (isDueToday) {
         farmersDueToday += 1;
         amountDueToday += finalAmount;
       } else {
         upcomingPaymentCount += 1;
         upcomingPaymentAmount += finalAmount;
       }
+
+      farmerCyclesSummary.push({
+        farmerId: cycle.farmer_id,
+        farmerName: cycle.farmer_name,
+        farmerPhone: cycle.farmer_phone,
+        farmerStatus: cycle.farmer_status || 'active',
+        cycleId: cycle.id,
+        startDate: cycle.start_date,
+        endDate: cycle.end_date,
+        durationDays: cycle.duration_days,
+        paymentDueDate: cycle.payment_due_date || cycle.end_date,
+        ratePerLiter: Number(cycle.rate_per_liter),
+        totalLiters: totalLiters,
+        grossAmount: grossAmount,
+        feedDeduction: feedDeduction,
+        finalAmount: finalAmount,
+        status: cycle.status || 'active',
+        daysRemaining: daysRemaining,
+        isOverdue: isOverdue,
+        overdueDays: isOverdue ? Math.abs(daysRemaining) : 0,
+        isDueToday: isDueToday,
+      });
     }
 
     res.json({
       success: true,
+      total_farmers: totalFarmerCount || activeFarmerCount,
       active_farmer_count: activeFarmerCount,
       today_morning_milk: morningMilk,
       today_evening_milk: eveningMilk,
       today_total_milk: totalMilkToday,
-      farmers_due_today: farmersDueToday,
-      amount_due_today: Number(amountDueToday.toFixed(2)),
+      active_cycles_count: activeCyclesCount,
+      total_pending_payment_amount: Number(totalPendingPaymentAmount.toFixed(2)),
+      total_expected_payout: Number(totalPendingPaymentAmount.toFixed(2)), // backwards compatibility
       overdue_farmers: overdueFarmers,
       overdue_amount: Number(overdueAmount.toFixed(2)),
+      farmers_due_today: farmersDueToday,
+      amount_due_today: Number(amountDueToday.toFixed(2)),
       upcoming_payment_count: upcomingPaymentCount,
       upcoming_payment_amount: Number(upcomingPaymentAmount.toFixed(2)),
-      total_pending_payment_amount: Number(totalPendingPaymentAmount.toFixed(2)),
-      active_cycles_count: activeCyclesCount,
+      farmer_cycles_summary: farmerCyclesSummary,
     });
   } finally {
     client.release();
