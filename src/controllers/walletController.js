@@ -12,26 +12,55 @@ const DEFAULT_MARGIN = 500;
 const MAX_MARGIN = Number(process.env.WALLET_MAX_MARGIN) || 500;
 
 // ────────────────────────────────────────────────
-// POST /wallet/receipts  – Record a received payment
+// ────────────────────────────────────────────────
+// POST /wallet/receipts  – Record a transaction (receipt, adjustment, or direct payment)
 // ────────────────────────────────────────────────
 const recordReceipt = asyncHandler(async (req, res) => {
-  const { amount, receiptDate, reference, notes } = req.body;
+  const { 
+    amount, 
+    receiptDate, 
+    receivedDate, 
+    transactionDate, 
+    reference, 
+    notes, 
+    description,
+    type, 
+    transactionType, 
+    adjustmentType 
+  } = req.body;
 
-  // Validate amount
-  const parsedAmount = parsePositiveNumber(amount);
-  if (!parsedAmount) {
-    return res.status(400).json({ success: false, message: 'amount must be a positive number.' });
-  }
-
-  // Validate receipt date
-  const parsedDate = receiptDate ? parseValidDate(receiptDate) : new Date();
+  const resolvedDate = receiptDate || receivedDate || transactionDate;
+  const parsedDate = resolvedDate ? parseValidDate(resolvedDate) : new Date();
   if (!parsedDate) {
-    return res.status(400).json({ success: false, message: 'receiptDate must be a valid date (YYYY-MM-DD).' });
+    return res.status(400).json({ success: false, message: 'Invalid transaction date (YYYY-MM-DD).' });
   }
   const isoDate = toIsoDateString(parsedDate);
 
-  // Check for duplicate reference
-  if (reference && reference.trim() !== '') {
+  const rawAmount = Number(amount);
+  if (!Number.isFinite(rawAmount) || rawAmount === 0) {
+    return res.status(400).json({ success: false, message: 'amount must be a valid non-zero number.' });
+  }
+
+  // Determine type: 'receipt', 'adjustment', or 'farmer_payment'
+  let resolvedType = transactionType || type || 'receipt';
+  if (!['receipt', 'adjustment', 'farmer_payment'].includes(resolvedType)) {
+    resolvedType = 'receipt';
+  }
+
+  // Calculate signed amount
+  let finalAmount = Math.abs(rawAmount);
+  if (resolvedType === 'farmer_payment') {
+    finalAmount = -Math.abs(rawAmount); // Debit
+  } else if (resolvedType === 'adjustment') {
+    if (adjustmentType === 'debit' || rawAmount < 0) {
+      finalAmount = -Math.abs(rawAmount);
+    } else {
+      finalAmount = Math.abs(rawAmount);
+    }
+  }
+
+  // Check for duplicate reference on receipts
+  if (resolvedType === 'receipt' && reference && reference.trim() !== '') {
     const existing = await walletModel.findReceiptByReference(reference.trim());
     if (existing) {
       return res.status(409).json({
@@ -50,30 +79,49 @@ const recordReceipt = asyncHandler(async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    const defaultDesc = resolvedType === 'receipt'
+      ? `Payment received from Hatsun on ${isoDate}`
+      : resolvedType === 'adjustment'
+        ? `Balance adjustment on ${isoDate}`
+        : `Direct payout on ${isoDate}`;
+
+    const descText = notes || description || defaultDesc;
+
     const entry = await walletModel.createLedgerEntry(
       {
-        transactionType: 'receipt',
-        amount: parsedAmount,
+        transactionType: resolvedType,
+        amount: finalAmount,
         transactionDate: isoDate,
         reference: reference ? reference.trim() : null,
-        description: notes || `Payment received from Hatsun on ${isoDate}`,
+        description: descText,
       },
       client
     );
 
     await client.query('COMMIT');
 
+    const entryData = {
+      id: entry.id,
+      transactionType: entry.transaction_type,
+      transaction_type: entry.transaction_type,
+      amount: Number(entry.amount),
+      runningBalance: Number(entry.running_balance),
+      running_balance: Number(entry.running_balance),
+      transactionDate: toIsoDateString(entry.transaction_date),
+      transaction_date: toIsoDateString(entry.transaction_date),
+      reference: entry.reference,
+      description: entry.description,
+      createdAt: entry.created_at,
+      created_at: entry.created_at,
+    };
+
     res.status(201).json({
       success: true,
-      receipt: {
-        id: entry.id,
-        amount: Number(entry.amount),
-        runningBalance: Number(entry.running_balance),
-        transactionDate: toIsoDateString(entry.transaction_date),
-        reference: entry.reference,
-        description: entry.description,
-        createdAt: entry.created_at,
-      },
+      newBalance: Number(entry.running_balance),
+      availableBalance: Number(entry.running_balance),
+      walletBalance: Number(entry.running_balance),
+      receipt: entryData,
+      transaction: entryData,
     });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -93,6 +141,8 @@ const getWalletBalance = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     balance,
+    currentBalance: balance,
+    walletBalance: balance,
     reservedForDistribution: reserved,
     availableBalance: Number(Math.max(0, balance - reserved).toFixed(2)),
   });
@@ -110,14 +160,18 @@ const getTransactions = asyncHandler(async (req, res) => {
     transactions: transactions.map((t) => ({
       id: t.id,
       transactionType: t.transaction_type,
+      transaction_type: t.transaction_type,
       amount: Number(t.amount),
       runningBalance: Number(t.running_balance),
+      running_balance: Number(t.running_balance),
       transactionDate: toIsoDateString(t.transaction_date),
+      transaction_date: toIsoDateString(t.transaction_date),
       reference: t.reference,
       description: t.description,
       relatedDistributionId: t.related_distribution_id ? Number(t.related_distribution_id) : null,
       relatedPaymentId: t.related_payment_id ? Number(t.related_payment_id) : null,
       createdAt: t.created_at,
+      created_at: t.created_at,
     })),
   });
 });
@@ -128,15 +182,26 @@ const getTransactions = asyncHandler(async (req, res) => {
 const getWalletSummary = asyncHandler(async (req, res) => {
   const summary = await walletModel.getWalletSummary();
   const reserved = await walletModel.getReservedAmount();
+  const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
+  const pendingTotal = unpaidCycles.reduce((sum, c) => sum + Number(c.finalAmount), 0);
 
   res.json({
     success: true,
+    walletBalance: summary.currentBalance,
     currentBalance: summary.currentBalance,
+    totalReceipts: summary.totalReceived,
     totalReceived: summary.totalReceived,
+    totalDisbursed: summary.totalPaidToFarmers,
     totalPaidToFarmers: summary.totalPaidToFarmers,
     totalAdjustments: summary.totalAdjustments,
     reservedForDistribution: reserved,
     availableBalance: Number(Math.max(0, summary.currentBalance - reserved).toFixed(2)),
+    pendingCyclesCount: unpaidCycles.length,
+    pendingCyclesTotal: Number(pendingTotal.toFixed(2)),
+    expectedDeposits: {
+      dates: [3, 13, 23],
+      alert: 'Expected deposit dates (3rd, 13th, 23rd) are strictly informational and never auto-credit the account. Money is only added when you record actual received payments.',
+    },
   });
 });
 

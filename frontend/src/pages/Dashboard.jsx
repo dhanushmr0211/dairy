@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [autoDistModalOpen, setAutoDistModalOpen] = useState(false);
 
   // Receipt form state
+  const [txType, setTxType] = useState('receipt'); // 'receipt', 'adjustment', 'farmer_payment'
+  const [adjustmentDirection, setAdjustmentDirection] = useState('credit'); // 'credit' or 'debit'
   const [receiptAmount, setReceiptAmount] = useState('');
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split('T')[0]);
   const [receiptRef, setReceiptRef] = useState('');
@@ -164,11 +166,11 @@ export default function Dashboard() {
     }
   };
 
-  // Record received wallet deposit
+  // Record received wallet deposit / transaction
   const handleRecordReceipt = async (e) => {
     e.preventDefault();
     if (!receiptAmount || Number(receiptAmount) <= 0) {
-      showToast('Please enter a valid positive deposit amount', 'error');
+      showToast('Please enter a valid positive amount', 'error');
       return;
     }
 
@@ -176,19 +178,25 @@ export default function Dashboard() {
       setSubmittingReceipt(true);
       const res = await recordWalletReceipt({
         amount: Number(receiptAmount),
+        transactionType: txType,
+        adjustmentType: adjustmentDirection,
         receivedDate: receiptDate,
+        receiptDate: receiptDate,
         reference: receiptRef.trim() || undefined,
         description: receiptDesc.trim() || undefined,
       });
 
-      showToast(`✓ Deposit of ₹${Number(res.receipt.amount).toLocaleString('en-IN')} recorded! New Wallet Balance: ₹${Number(res.newBalance).toLocaleString('en-IN')}`);
+      const updatedBal = res.newBalance ?? res.availableBalance ?? res.walletBalance ?? 0;
+      showToast(`✓ Transaction recorded! New Wallet Balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
       setReceiptModalOpen(false);
       setReceiptAmount('');
       setReceiptRef('');
       setReceiptDesc('');
+      setTxType('receipt');
+      setAdjustmentDirection('credit');
       loadDashboard();
     } catch (err) {
-      showToast(err.message || 'Failed to record receipt', 'error');
+      showToast(err.message || 'Failed to record transaction', 'error');
     } finally {
       setSubmittingReceipt(false);
     }
@@ -234,6 +242,7 @@ export default function Dashboard() {
     filteredCycles.every((c) => selectedCycleIds.includes(c.cycleId));
 
   const walletInfo = data?.wallet;
+  const currentWalletBal = Number(walletInfo?.availableBalance ?? walletInfo?.balance ?? walletInfo?.currentBalance ?? 0);
 
   return (
     <div>
@@ -347,7 +356,7 @@ export default function Dashboard() {
                 <button 
                   className="btn btn-primary btn-sm"
                   onClick={() => handleOpenAutoDistribution('BELOW_BALANCE')}
-                  disabled={!walletInfo || walletInfo.balance <= 0}
+                  disabled={currentWalletBal <= 0}
                 >
                   ⚡ Auto-Distribute (Oldest First)
                 </button>
@@ -364,11 +373,11 @@ export default function Dashboard() {
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
                   Available Wallet Balance
                 </div>
-                <div style={{ fontSize: 'var(--fs-3xl)', fontWeight: 800, color: Number(walletInfo?.balance || 0) > 0 ? 'var(--clr-success)' : 'var(--clr-text)', marginTop: '0.25rem' }}>
-                  ₹{Number(walletInfo?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div style={{ fontSize: 'var(--fs-3xl)', fontWeight: 800, color: currentWalletBal > 0 ? 'var(--clr-success)' : 'var(--clr-text)', marginTop: '0.25rem' }}>
+                  ₹{currentWalletBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
-                  {Number(walletInfo?.balance || 0) > 0 ? 'Funds ready for distribution' : 'Wallet empty (record deposit below)'}
+                  {currentWalletBal > 0 ? 'Funds ready for distribution' : 'Wallet empty (record deposit below)'}
                 </div>
               </div>
 
@@ -846,8 +855,51 @@ export default function Dashboard() {
             </p>
 
             <form onSubmit={handleRecordReceipt}>
+              {/* Transaction Type Selector */}
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Deposit Amount (₹) *</label>
+                <label className="form-label">Transaction Type *</label>
+                <select
+                  className="form-select"
+                  value={txType}
+                  onChange={(e) => setTxType(e.target.value)}
+                >
+                  <option value="receipt">📥 Deposit from Hatsun (Payment Received - Credits Wallet)</option>
+                  <option value="adjustment">⚖️ Balance Adjustment / Initial Deposit</option>
+                  <option value="farmer_payment">📤 Direct Farmer Payout / Debit (Deducts from Wallet)</option>
+                </select>
+              </div>
+
+              {/* Direction selector if Adjustment */}
+              {txType === 'adjustment' && (
+                <div className="form-group" style={{ marginBottom: '1rem', background: 'var(--clr-surface-alt)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--clr-border)' }}>
+                  <label className="form-label">Adjustment Direction *</label>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
+                      <input 
+                        type="radio" 
+                        name="adjDirDash" 
+                        value="credit" 
+                        checked={adjustmentDirection === 'credit'} 
+                        onChange={() => setAdjustmentDirection('credit')}
+                      />
+                      ➕ Add Funds (Credit)
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
+                      <input 
+                        type="radio" 
+                        name="adjDirDash" 
+                        value="debit" 
+                        checked={adjustmentDirection === 'debit'} 
+                        onChange={() => setAdjustmentDirection('debit')}
+                      />
+                      ➖ Deduct Funds (Debit)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Amount (₹) *</label>
                 <input
                   type="number"
                   step="0.01"

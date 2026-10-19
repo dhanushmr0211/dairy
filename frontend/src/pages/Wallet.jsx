@@ -24,7 +24,9 @@ export default function Wallet() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [distModalOpen, setDistModalOpen] = useState(false);
 
-  // Record Receipt Form
+  // Transaction Form State
+  const [txType, setTxType] = useState('receipt'); // 'receipt', 'adjustment', 'farmer_payment'
+  const [adjustmentDirection, setAdjustmentDirection] = useState('credit'); // 'credit' or 'debit'
   const [receiptAmount, setReceiptAmount] = useState('');
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split('T')[0]);
   const [receiptRef, setReceiptRef] = useState('');
@@ -63,10 +65,10 @@ export default function Wallet() {
     loadData();
   }, [loadData]);
 
-  const handleRecordReceipt = async (e) => {
+  const handleRecordTransaction = async (e) => {
     e.preventDefault();
     if (!receiptAmount || Number(receiptAmount) <= 0) {
-      showToast('Please enter a valid positive deposit amount', 'error');
+      showToast('Please enter a valid positive amount', 'error');
       return;
     }
 
@@ -74,19 +76,25 @@ export default function Wallet() {
       setSubmittingReceipt(true);
       const res = await recordWalletReceipt({
         amount: Number(receiptAmount),
+        transactionType: txType,
+        adjustmentType: adjustmentDirection,
+        receiptDate: receiptDate,
         receivedDate: receiptDate,
         reference: receiptRef.trim() || undefined,
         description: receiptDesc.trim() || undefined,
       });
 
-      showToast(`✓ Received payment of ₹${Number(res.receipt.amount).toLocaleString('en-IN')} recorded! Current balance: ₹${Number(res.newBalance).toLocaleString('en-IN')}`);
+      const updatedBal = res.newBalance ?? res.availableBalance ?? res.walletBalance ?? 0;
+      showToast(`✓ Transaction recorded! New wallet balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
       setReceiptModalOpen(false);
       setReceiptAmount('');
       setReceiptRef('');
       setReceiptDesc('');
+      setTxType('receipt');
+      setAdjustmentDirection('credit');
       loadData();
     } catch (err) {
-      showToast(err.message || 'Failed to record receipt', 'error');
+      showToast(err.message || 'Failed to record transaction', 'error');
     } finally {
       setSubmittingReceipt(false);
     }
@@ -125,6 +133,27 @@ export default function Wallet() {
     }
   };
 
+  // Safe formatting helpers
+  const formatTxDate = (tx) => {
+    const raw = tx.transactionDate || tx.transaction_date || tx.createdAt || tx.created_at;
+    if (!raw) return '—';
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+  };
+
+  const formatTxTime = (tx) => {
+    const raw = tx.createdAt || tx.created_at;
+    if (!raw) return '';
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Safe balance values
+  const availableBal = Number(summary?.availableBalance ?? summary?.walletBalance ?? summary?.currentBalance ?? 0);
+  const totalRec = Number(summary?.totalReceipts ?? summary?.totalReceived ?? 0);
+  const totalDis = Number(summary?.totalDisbursed ?? summary?.totalPaidToFarmers ?? 0);
+  const pendingDues = Number(summary?.pendingCyclesTotal ?? 0);
+
   return (
     <div>
       {/* ── Page Header ── */}
@@ -135,12 +164,12 @@ export default function Wallet() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)}>
-            <span>➕</span> Record Received Payment
+            <span>➕</span> Record Received Payment / Deposit
           </button>
           <button 
             className="btn btn-success btn-sm" 
             onClick={() => handleOpenDistributionPreview('BELOW_BALANCE')}
-            disabled={!summary || summary.walletBalance <= 0}
+            disabled={availableBal <= 0}
           >
             <span>⚡</span> Auto-Distribute
           </button>
@@ -165,11 +194,11 @@ export default function Wallet() {
           <div className="stats-grid">
             <div className="stat-card success">
               <div className="stat-label">Available Wallet Balance</div>
-              <div className="stat-value" style={{ color: Number(summary?.walletBalance || 0) > 0 ? 'var(--clr-success)' : undefined }}>
-                ₹{Number(summary?.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="stat-value" style={{ color: availableBal > 0 ? 'var(--clr-success)' : undefined }}>
+                ₹{availableBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
-                {Number(summary?.walletBalance || 0) > 0 ? 'Funds available for distribution' : 'Wallet empty'}
+                {availableBal > 0 ? 'Funds available for distribution' : 'Wallet balance empty'}
               </div>
               <div className="stat-icon">🏦</div>
             </div>
@@ -177,7 +206,7 @@ export default function Wallet() {
             <div className="stat-card primary">
               <div className="stat-label">Total Receipts from Hatsun</div>
               <div className="stat-value">
-                ₹{Number(summary?.totalReceipts || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{totalRec.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Lifetime confirmed deposits
@@ -188,7 +217,7 @@ export default function Wallet() {
             <div className="stat-card accent">
               <div className="stat-label">Total Disbursed to Farmers</div>
               <div className="stat-value">
-                ₹{Number(summary?.totalDisbursed || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{totalDis.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Lifetime farmer cycle payouts
@@ -199,7 +228,7 @@ export default function Wallet() {
             <div className="stat-card warning">
               <div className="stat-label">Pending Farmers Due</div>
               <div className="stat-value">
-                ₹{Number(summary?.pendingCyclesTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{pendingDues.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Across {summary?.pendingCyclesCount || 0} unpaid cycles
@@ -306,15 +335,20 @@ export default function Wallet() {
                     </thead>
                     <tbody>
                       {transactions.map((tx) => {
-                        const isCredit = tx.transaction_type === 'receipt';
-                        const isDebit = tx.transaction_type === 'farmer_payment';
+                        const typeVal = tx.transactionType || tx.transaction_type || '';
+                        const isCredit = typeVal === 'receipt';
+                        const isDebit = typeVal === 'farmer_payment';
+                        const isAdjustment = typeVal === 'adjustment';
+
+                        const numAmount = Number(tx.amount || 0);
+                        const runningBal = Number(tx.runningBalance ?? tx.running_balance ?? 0);
 
                         return (
                           <tr key={tx.id}>
                             <td>
-                              <div style={{ fontWeight: 600 }}>{new Date(tx.transaction_date).toLocaleDateString()}</div>
+                              <div style={{ fontWeight: 600 }}>{formatTxDate(tx)}</div>
                               <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
-                                {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formatTxTime(tx)}
                               </span>
                             </td>
                             <td>
@@ -327,18 +361,24 @@ export default function Wallet() {
                               )}
                             </td>
                             <td>
-                              <div style={{ fontWeight: 500 }}>{tx.description || (isCredit ? 'Hatsun Company Deposit' : 'Farmer Cycle Payout')}</div>
+                              <div style={{ fontWeight: 500 }}>
+                                {tx.description || (isCredit ? 'Payment received from Hatsun' : isDebit ? 'Farmer Cycle Payout' : 'Ledger Adjustment')}
+                              </div>
                               {tx.reference && (
                                 <span style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
                                   Ref: <code>{tx.reference}</code>
                                 </span>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, color: isCredit ? 'var(--clr-success)' : 'var(--clr-danger)' }}>
-                              {isCredit ? '+' : '-'}₹{Number(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <td style={{ 
+                              textAlign: 'right', 
+                              fontWeight: 700, 
+                              color: isCredit ? 'var(--clr-success)' : isDebit ? 'var(--clr-danger)' : (numAmount >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)')
+                            }}>
+                              {isCredit ? '+' : isDebit ? '-' : (numAmount >= 0 ? '+' : '-')}₹{Math.abs(numAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                              ₹{Number(tx.running_balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{runningBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                         );
@@ -385,28 +425,28 @@ export default function Wallet() {
                       {distHistory.map((h) => (
                         <tr key={h.id}>
                           <td>
-                            <strong>{new Date(h.created_at).toLocaleDateString()}</strong>
+                            <strong>{new Date(h.created_at || h.createdAt || Date.now()).toLocaleDateString()}</strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
-                              {new Date(h.created_at).toLocaleTimeString()}
+                              {new Date(h.created_at || h.createdAt || Date.now()).toLocaleTimeString()}
                             </div>
                           </td>
                           <td>
                             <span className={`badge ${h.status === 'confirmed' ? 'badge-active' : 'badge-morning'}`}>
-                              {h.status.toUpperCase()}
+                              {(h.status || 'pending').toUpperCase()}
                             </span>
                           </td>
                           <td>
                             <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
-                              {h.mode} {h.mode === 'WITHIN_MARGIN' && `(₹${h.margin} margin)`}
+                              {h.mode} {h.mode === 'WITHIN_MARGIN' && `(₹${h.margin || 500} margin)`}
                             </span>
                           </td>
-                          <td><strong>{h.selected_cycle_count}</strong> cycles</td>
-                          <td><strong>{h.selected_farmer_count}</strong> farmers</td>
+                          <td><strong>{h.selected_cycle_count ?? h.selectedCycleCount ?? 0}</strong> cycles</td>
+                          <td><strong>{h.selected_farmer_count ?? h.selectedFarmerCount ?? 0}</strong> farmers</td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--clr-success)' }}>
-                            ₹{Number(h.proposed_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{Number(h.proposed_total ?? h.proposedTotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                            ₹{Number(h.remaining_balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ₹{Number(h.remaining_balance ?? h.remainingBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       ))}
@@ -419,18 +459,61 @@ export default function Wallet() {
         </>
       )}
 
-      {/* ═══ Record Receipt Modal ═══ */}
+      {/* ═══ Record Transaction / Deposit Modal ═══ */}
       {receiptModalOpen && (
         <div className="modal-overlay" onClick={() => setReceiptModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🏦 Record Received Company Deposit</h3>
+            <h3>🏦 Record Payment / Transaction</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
-              Confirm funds deposited by Hatsun into the dairy account. Expected payment dates (3rd, 13th, 23rd) are never auto-credited.
+              Select the transaction type below to credit received funds from Hatsun or record adjustments.
             </p>
 
-            <form onSubmit={handleRecordReceipt}>
+            <form onSubmit={handleRecordTransaction}>
+              {/* Transaction Type Selector */}
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Deposit Amount (₹) *</label>
+                <label className="form-label">Transaction Type *</label>
+                <select
+                  className="form-select"
+                  value={txType}
+                  onChange={(e) => setTxType(e.target.value)}
+                >
+                  <option value="receipt">📥 Deposit from Hatsun (Payment Received - Credits Wallet)</option>
+                  <option value="adjustment">⚖️ Balance Adjustment / Initial Deposit</option>
+                  <option value="farmer_payment">📤 Direct Farmer Payout / Debit (Deducts from Wallet)</option>
+                </select>
+              </div>
+
+              {/* Direction selector if Adjustment */}
+              {txType === 'adjustment' && (
+                <div className="form-group" style={{ marginBottom: '1rem', background: 'var(--clr-surface-alt)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--clr-border)' }}>
+                  <label className="form-label">Adjustment Direction *</label>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
+                      <input 
+                        type="radio" 
+                        name="adjDir" 
+                        value="credit" 
+                        checked={adjustmentDirection === 'credit'} 
+                        onChange={() => setAdjustmentDirection('credit')}
+                      />
+                      ➕ Add Funds to Wallet (Credit)
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
+                      <input 
+                        type="radio" 
+                        name="adjDir" 
+                        value="debit" 
+                        checked={adjustmentDirection === 'debit'} 
+                        onChange={() => setAdjustmentDirection('debit')}
+                      />
+                      ➖ Deduct Funds from Wallet (Debit)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Amount (₹) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -443,7 +526,7 @@ export default function Wallet() {
               </div>
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
-                <label className="form-label">Actual Receipt Date *</label>
+                <label className="form-label">Transaction Date *</label>
                 <input
                   type="date"
                   required
@@ -463,7 +546,7 @@ export default function Wallet() {
                   onChange={(e) => setReceiptRef(e.target.value)}
                 />
                 <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
-                  Must be unique to prevent duplicate receipts.
+                  Must be unique for Hatsun receipts to prevent duplicate entries.
                 </span>
               </div>
 
@@ -471,7 +554,13 @@ export default function Wallet() {
                 <label className="form-label">Description / Notes</label>
                 <input
                   type="text"
-                  placeholder="e.g. Hatsun settlement for milk collection cycle"
+                  placeholder={
+                    txType === 'receipt'
+                      ? 'e.g. Hatsun settlement for milk collection cycle'
+                      : txType === 'adjustment'
+                        ? 'e.g. Initial company balance or bank interest'
+                        : 'e.g. Direct cash payout'
+                  }
                   className="form-input"
                   value={receiptDesc}
                   onChange={(e) => setReceiptDesc(e.target.value)}
@@ -492,7 +581,7 @@ export default function Wallet() {
                   className="btn btn-primary"
                   disabled={submittingReceipt}
                 >
-                  {submittingReceipt ? <span className="spinner"></span> : 'Credit Wallet'}
+                  {submittingReceipt ? <span className="spinner"></span> : txType === 'farmer_payment' || (txType === 'adjustment' && adjustmentDirection === 'debit') ? 'Deduct from Wallet' : 'Add to Wallet'}
                 </button>
               </div>
             </form>
@@ -535,15 +624,15 @@ export default function Wallet() {
                 <div className="summary-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '1.25rem' }}>
                   <div className="summary-item">
                     <div className="label">Wallet Balance</div>
-                    <div className="value">₹{Number(distPreview.walletBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="value">₹{Number(distPreview.walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
                   <div className="summary-item">
                     <div className="label">Proposed Payout</div>
-                    <div className="value positive">₹{Number(distPreview.proposedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="value positive">₹{Number(distPreview.proposedTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
                   <div className="summary-item">
                     <div className="label">Remaining Balance</div>
-                    <div className="value">₹{Number(distPreview.remainingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="value">₹{Number(distPreview.remainingBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
                 </div>
 
