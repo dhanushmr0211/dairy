@@ -144,7 +144,8 @@ const getWalletSummary = asyncHandler(async (req, res) => {
 // POST /wallet/distribute/preview  – Automatic distribution preview
 // ────────────────────────────────────────────────
 const distributePreview = asyncHandler(async (req, res) => {
-  const { mode: requestedMode, margin: requestedMargin } = req.body || {};
+  const params = { ...(req.query || {}), ...(req.body || {}) };
+  const { mode: requestedMode, margin: requestedMargin } = params;
 
   // Determine mode
   const mode = requestedMode === 'WITHIN_MARGIN' ? 'WITHIN_MARGIN' : 'BELOW_BALANCE';
