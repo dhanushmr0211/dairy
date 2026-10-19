@@ -22,6 +22,18 @@ function errorHandler(err, req, res, next) {
       return res.status(409).json({ success: false, message: 'A farmer with this phone number already exists.' });
     }
 
+    if (err.constraint === 'idx_wallet_ledger_unique_receipt_reference') {
+      return res.status(409).json({ success: false, message: 'A receipt with this reference number already exists.' });
+    }
+
+    if (err.constraint === 'wallet_ledger_idempotency_key_key') {
+      return res.status(409).json({ success: false, message: 'Duplicate wallet transaction (idempotency key already used).' });
+    }
+
+    if (err.constraint === 'distribution_previews_idempotency_key_key') {
+      return res.status(409).json({ success: false, message: 'Distribution already processed (idempotency key already used).' });
+    }
+
     return res.status(409).json({ success: false, message: 'Duplicate value violates unique constraint.' });
   }
 

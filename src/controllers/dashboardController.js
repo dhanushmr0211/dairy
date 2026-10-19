@@ -2,6 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const farmerModel = require('../models/farmerModel');
 const milkModel = require('../models/milkModel');
 const cycleModel = require('../models/cycleModel');
+const walletModel = require('../models/walletModel');
+const distributionModel = require('../models/distributionModel');
 const { getCyclePaymentSummary } = require('../utils/paymentCalculator');
 const { toIsoDateString } = require('../utils/validation');
 const db = require('../config/db');
@@ -27,6 +29,9 @@ const getDashboard = asyncHandler(async (req, res) => {
       totalMilkToday,
       activeCyclesCount,
       unpaidCycles,
+      walletBalance,
+      latestReceipt,
+      reservedAmount,
     ] = await Promise.all([
       farmerModel.getActiveFarmersCount(client),
       farmerModel.getTotalFarmersCount(client),
@@ -35,6 +40,9 @@ const getDashboard = asyncHandler(async (req, res) => {
       milkModel.getTodayMilkTotal(client),
       cycleModel.getActiveCycleCount(client),
       cycleModel.getAllUnpaidCycles(client),
+      walletModel.getWalletBalance(client),
+      walletModel.getLatestReceipt(client),
+      walletModel.getReservedAmount(client),
     ]);
 
     let farmersDueToday = 0;
@@ -44,6 +52,7 @@ const getDashboard = asyncHandler(async (req, res) => {
     let upcomingPaymentCount = 0;
     let upcomingPaymentAmount = 0;
     let totalPendingPaymentAmount = 0;
+    let oldestUnpaidCycleDate = null;
 
     const farmerCyclesSummary = [];
 
@@ -66,6 +75,12 @@ const getDashboard = asyncHandler(async (req, res) => {
       } else {
         upcomingPaymentCount += 1;
         upcomingPaymentAmount += finalAmount;
+      }
+
+      // Track oldest unpaid cycle
+      const cycleStart = toIsoDateString(cycle.start_date);
+      if (!oldestUnpaidCycleDate || cycleStart < oldestUnpaidCycleDate) {
+        oldestUnpaidCycleDate = cycleStart;
       }
 
       farmerCyclesSummary.push({
@@ -91,6 +106,40 @@ const getDashboard = asyncHandler(async (req, res) => {
       });
     }
 
+    // Look for the latest pending (non-expired) distribution preview
+    let proposedDistribution = null;
+    await distributionModel.expireOldPreviews(client);
+
+    const previewsResult = await client.query(
+      `SELECT id, proposed_total, selected_cycle_count, selected_farmer_count, remaining_balance, shortfall, mode, margin
+       FROM distribution_previews
+       WHERE status = 'pending' AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`
+    );
+
+    if (previewsResult.rows.length > 0) {
+      const p = previewsResult.rows[0];
+      proposedDistribution = {
+        previewId: Number(p.id),
+        proposedTotal: Number(p.proposed_total),
+        selectedCycleCount: p.selected_cycle_count,
+        selectedFarmerCount: p.selected_farmer_count,
+        remainingBalanceAfter: Number(p.remaining_balance),
+        shortfall: Number(p.shortfall),
+        mode: p.mode,
+        margin: Number(p.margin),
+      };
+    }
+
+    // After-distribution simulations
+    const afterOverdueAmount = proposedDistribution
+      ? Number(Math.max(0, overdueAmount - proposedDistribution.proposedTotal).toFixed(2))
+      : Number(overdueAmount.toFixed(2));
+    const afterTotalOutstanding = proposedDistribution
+      ? Number(Math.max(0, totalPendingPaymentAmount - proposedDistribution.proposedTotal).toFixed(2))
+      : Number(totalPendingPaymentAmount.toFixed(2));
+
     res.json({
       success: true,
       total_farmers: totalFarmerCount || activeFarmerCount,
@@ -107,6 +156,33 @@ const getDashboard = asyncHandler(async (req, res) => {
       amount_due_today: Number(amountDueToday.toFixed(2)),
       upcoming_payment_count: upcomingPaymentCount,
       upcoming_payment_amount: Number(upcomingPaymentAmount.toFixed(2)),
+
+      // ── Wallet Information ──
+      wallet: {
+        currentBalance: walletBalance,
+        latestReceipt: latestReceipt
+          ? {
+              amount: Number(latestReceipt.amount),
+              date: toIsoDateString(latestReceipt.transaction_date),
+              reference: latestReceipt.reference,
+            }
+          : null,
+        reservedForDistribution: reservedAmount,
+        proposedDistribution,
+        oldestUnpaidCycleDate,
+        beforeDistribution: {
+          overdueAmount: Number(overdueAmount.toFixed(2)),
+          totalOutstanding: Number(totalPendingPaymentAmount.toFixed(2)),
+        },
+        afterDistribution: {
+          overdueAmount: afterOverdueAmount,
+          totalOutstanding: afterTotalOutstanding,
+          remainingBalance: proposedDistribution
+            ? proposedDistribution.remainingBalanceAfter
+            : walletBalance,
+        },
+      },
+
       farmer_cycles_summary: farmerCyclesSummary,
     });
   } finally {

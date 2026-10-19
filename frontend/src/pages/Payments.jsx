@@ -526,7 +526,7 @@ export default function Payments() {
                             <td>{Number(item.totalLiters).toFixed(2)}L</td>
                             <td>{new Date(item.paymentDueDate).toLocaleDateString()}</td>
                             <td>
-                              <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: 'var(--clr-danger)' }}>
+                              <span className="badge" style={{ background: 'var(--clr-danger-light)', color: 'var(--clr-danger)', border: '1px solid var(--clr-danger-border)', fontWeight: 600 }}>
                                 {Math.abs(item.daysRemaining)} Days Overdue
                               </span>
                             </td>

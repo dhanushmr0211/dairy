@@ -69,6 +69,15 @@ export default function Layout({ children }) {
             <span className="icon">💳</span>
             Cycles & Payments
           </NavLink>
+
+          <NavLink 
+            to="/wallet" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            onClick={closeMobile}
+          >
+            <span className="icon">🏦</span>
+            Company Wallet
+          </NavLink>
         </nav>
       </aside>
 

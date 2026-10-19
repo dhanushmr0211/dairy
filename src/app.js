@@ -9,6 +9,7 @@ const milkRoutes = require('./routes/milkRoutes');
 const feedRoutes = require('./routes/feedRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 
 const { globalRateLimiter } = require('./middleware/rateLimiter');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
@@ -54,6 +55,7 @@ app.use('/milk', milkRoutes);
 app.use('/feed', feedRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/wallet', walletRoutes);
 
 // Centralized error handling
 app.use(notFound);

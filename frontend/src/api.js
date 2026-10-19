@@ -103,3 +103,35 @@ export function payCycle(body) {
 export function getPaymentsByFarmer(farmerId) {
   return request(`/payments/${farmerId}`);
 }
+
+// ── Wallet & Automated Distribution ──
+export function getWalletBalance() {
+  return request('/wallet/balance');
+}
+
+export function getWalletSummary() {
+  return request('/wallet/summary');
+}
+
+export function getWalletTransactions(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/wallet/transactions${query ? `?${query}` : ''}`);
+}
+
+export function recordWalletReceipt(body) {
+  return request('/wallet/receipt', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function getDistributionPreview(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/wallet/distribution/preview${query ? `?${query}` : ''}`);
+}
+
+export function confirmDistribution(body) {
+  return request('/wallet/distribution/confirm', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function getDistributionHistory(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/wallet/distribution/history${query ? `?${query}` : ''}`);
+}

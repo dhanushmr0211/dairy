@@ -6,6 +6,7 @@ import Farmers from './pages/Farmers';
 import MilkEntries from './pages/MilkEntries';
 import FeedRecords from './pages/FeedRecords';
 import Payments from './pages/Payments';
+import Wallet from './pages/Wallet';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/milk" element={<MilkEntries />} />
             <Route path="/feed" element={<FeedRecords />} />
             <Route path="/payments" element={<Payments />} />
+            <Route path="/wallet" element={<Wallet />} />
           </Routes>
         </Layout>
       </Router>
