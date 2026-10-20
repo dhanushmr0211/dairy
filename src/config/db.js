@@ -1,4 +1,7 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Parse PostgreSQL DATE (OID 1082) as exact 'YYYY-MM-DD' string to prevent local timezone offsets
+types.setTypeParser(1082, (val) => val);
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is required.');

@@ -5,6 +5,23 @@ function notFound(req, res) {
 function errorHandler(err, req, res, next) {
   const statusCode = err.statusCode || 500;
 
+  // PostgreSQL PL/pgSQL RAISE EXCEPTION (from triggers or custom checks)
+  if (err.code === 'P0001') {
+    return res.status(409).json({
+      success: false,
+      message: err.message || 'Operation violates payment cycle lock constraints.',
+    });
+  }
+
+  // PostgreSQL Exclusion Constraint Violation (e.g. no_overlapping_cycles_per_farmer)
+  if (err.code === '23P01' || err.constraint === 'no_overlapping_cycles_per_farmer') {
+    return res.status(409).json({
+      success: false,
+      message: 'Cycle dates overlap with an existing cycle for this farmer.',
+    });
+  }
+
+  // PostgreSQL Unique Constraint Violation
   if (err.code === '23505') {
     if (err.constraint === 'idx_farmer_one_active_cycle') {
       return res.status(409).json({ success: false, message: 'Farmer already has an active payment cycle.' });

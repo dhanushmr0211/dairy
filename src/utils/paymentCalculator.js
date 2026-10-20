@@ -3,7 +3,7 @@ const feedModel = require('../models/feedModel');
 
 /**
  * Calculates payment details for a given cycle.
- * Safe calculation ensuring non-negative final payment.
+ * Final amount can be negative when feed deduction exceeds gross amount.
  * 
  * @param {Object} cycle - cycle record (id, farmer_id, start_date, end_date, rate_per_liter)
  * @param {Object} [client] - optional pg client for transaction support
@@ -21,9 +21,8 @@ async function getCyclePaymentSummary(cycle, client) {
     client
   );
 
-  // Safe deduction: ensure payment cannot be negative
-  const rawFinal = grossAmount - feedDeduction;
-  const finalAmount = Number(Math.max(0, rawFinal).toFixed(2));
+  // Allow negative final amounts when feed deduction exceeds gross amount
+  const finalAmount = Number((grossAmount - feedDeduction).toFixed(2));
 
   return {
     totalLiters,

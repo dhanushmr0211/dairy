@@ -252,6 +252,31 @@ const distributePreview = asyncHandler(async (req, res) => {
 
   for (const cycle of unpaidCycles) {
     const cycleAmount = cycle.finalAmount;
+
+    // Skip negative and zero settlements from cash distribution
+    if (cycleAmount <= 0) {
+      unselectedCycles.push({
+        cycleId: cycle.cycleId,
+        farmerId: cycle.farmerId,
+        farmerName: cycle.farmerName,
+        farmerPhone: cycle.farmerPhone,
+        startDate: toIsoDateString(cycle.startDate),
+        endDate: toIsoDateString(cycle.endDate),
+        durationDays: cycle.durationDays,
+        paymentDueDate: toIsoDateString(cycle.paymentDueDate),
+        ratePerLiter: cycle.ratePerLiter,
+        totalLiters: cycle.totalLiters,
+        grossAmount: cycle.grossAmount,
+        feedDeduction: cycle.feedDeduction,
+        calculatedAmount: cycleAmount,
+        status: cycle.status,
+        skipReason: cycleAmount === 0
+          ? 'Zero settlement — nothing to pay.'
+          : `Negative settlement (₹${cycleAmount}) — farmer owes the dairy. Not included in cash distribution.`,
+      });
+      continue;
+    }
+
     const newTotal = Number((proposedTotal + cycleAmount).toFixed(2));
 
     if (newTotal <= budget) {
@@ -470,6 +495,16 @@ const distributeConfirm = asyncHandler(async (req, res) => {
       }
 
       const { totalLiters, grossAmount, feedDeduction, finalAmount } = await getCyclePaymentSummary(cycle, client);
+
+      // Safety: reject negative or zero settlements from wallet distribution
+      if (finalAmount <= 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: `Cycle #${cycle.id} has a non-positive settlement (₹${finalAmount}). Negative/zero settlements cannot be distributed via wallet. Please generate a new preview.`,
+        });
+      }
+
       recalculatedAmounts.set(Number(cycle.id), { totalLiters, grossAmount, feedDeduction, finalAmount });
       recalculatedTotal = Number((recalculatedTotal + finalAmount).toFixed(2));
     }
@@ -543,18 +578,20 @@ const distributeConfirm = asyncHandler(async (req, res) => {
       // Update distribution_cycles with the payment ID
       await distributionModel.updateDistributionCyclePayment(previewId, cycle.id, payment.id, client);
 
-      // Create wallet debit entry
-      await walletModel.createLedgerEntry(
-        {
-          transactionType: 'farmer_payment',
-          amount: -calc.finalAmount,
-          transactionDate: paidDate,
-          description: `Payment for cycle #${cycle.id} (${cycle.farmer_name})`,
-          relatedDistributionId: previewId,
-          relatedPaymentId: payment.id,
-        },
-        client
-      );
+      // Create wallet debit entry (only for positive amounts)
+      if (calc.finalAmount > 0) {
+        await walletModel.createLedgerEntry(
+          {
+            transactionType: 'farmer_payment',
+            amount: -calc.finalAmount,
+            transactionDate: paidDate,
+            description: `Payment for cycle #${cycle.id} (${cycle.farmer_name})`,
+            relatedDistributionId: previewId,
+            relatedPaymentId: payment.id,
+          },
+          client
+        );
+      }
 
       paymentsCreated.push({
         paymentId: payment.id,

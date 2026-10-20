@@ -84,7 +84,7 @@ function computeFinancialMetrics(unpaidCycles, selectedIdsSet = new Set(), today
 
 // ── GET /payments/pending (Filtered Payment Cycles) ──
 const getPendingPayments = asyncHandler(async (req, res) => {
-  const { status, farmerId, date, dateFrom, dateTo, duration } = req.query;
+  const { status, farmerId, date, dateFrom, dateTo, duration, cycleType } = req.query;
   const todayStr = toIsoDateString(new Date());
 
   const unpaidCycles = await cycleModel.getUnpaidCyclesWithCalculations();
@@ -126,10 +126,15 @@ const getPendingPayments = asyncHandler(async (req, res) => {
       if (parsedTo && dueDateStr > toIsoDateString(parsedTo)) return false;
     }
 
-    // Duration filter
-    if (duration) {
-      const pDur = Number(duration);
-      if ([15, 30].includes(pDur) && c.durationDays !== pDur) return false;
+    // Duration / Cycle type filter
+    if (duration || cycleType) {
+      const durStr = String(duration || cycleType).toLowerCase();
+      if (durStr === 'calendar_month' || durStr === 'month') {
+        if (c.cycleType !== 'calendar_month') return false;
+      } else {
+        const pDur = Number(duration || cycleType);
+        if (pDur && c.durationDays !== pDur) return false;
+      }
     }
 
     return true;
@@ -147,6 +152,7 @@ const getPendingPayments = asyncHandler(async (req, res) => {
       startDate: toIsoDateString(c.startDate),
       endDate: toIsoDateString(c.endDate),
       durationDays: c.durationDays,
+      cycleType: c.cycleType || (c.durationDays === 30 ? '30_days' : c.durationDays === 15 ? '15_days' : 'calendar_month'),
       paymentDueDate: dueDateStr,
       daysRemaining,
       ratePerLiter: c.ratePerLiter,
@@ -600,6 +606,22 @@ const getPaymentsByFarmer = asyncHandler(async (req, res) => {
   res.json(payments);
 });
 
+// ── PUT /payments/:id (Blocked - completed payments permanently locked) ──
+const updatePayment = asyncHandler(async (req, res) => {
+  return res.status(409).json({
+    success: false,
+    message: 'Completed payment records cannot be edited.',
+  });
+});
+
+// ── DELETE /payments/:id (Blocked - completed payments permanently locked) ──
+const deletePayment = asyncHandler(async (req, res) => {
+  return res.status(409).json({
+    success: false,
+    message: 'Completed payment records cannot be deleted.',
+  });
+});
+
 module.exports = {
   getPendingPayments,
   getFinancialSummary,
@@ -610,4 +632,6 @@ module.exports = {
   paySelectedCycles,
   payCycle,
   getPaymentsByFarmer,
+  updatePayment,
+  deletePayment,
 };

@@ -22,4 +22,8 @@ router.post('/pay', paymentController.payCycle);
 // ── Farmer payment history (must remain after named subpaths) ──
 router.get('/:farmerId', paymentController.getPaymentsByFarmer);
 
+// ── Blocked payment modifications ──
+router.put('/:id', paymentController.updatePayment);
+router.delete('/:id', paymentController.deletePayment);
+
 module.exports = router;

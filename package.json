@@ -6,8 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test/test_calculator.js && node test/test_wallet.js",
-    "test:wallet": "node test/test_wallet.js"
+    "test": "node test/test_calculator.js && node test/test_wallet.js && node test/test_cycle_dates_and_locks.js",
+    "test:wallet": "node test/test_wallet.js",
+    "test:cycles": "node test/test_cycle_dates_and_locks.js"
   },
   "repository": {
     "type": "git",

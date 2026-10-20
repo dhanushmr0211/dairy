@@ -1,3 +1,4 @@
+const db = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const cycleModel = require('../models/cycleModel');
 const milkModel = require('../models/milkModel');
@@ -39,12 +40,6 @@ const addMilkEntry = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'date must be a valid date (YYYY-MM-DD).' });
   }
 
-  // Prevent future dates
-  const todayVal = toDateOnlyTimeValue(new Date());
-  const entryTimeValue = toDateOnlyTimeValue(parsedDate);
-  if (entryTimeValue > todayVal) {
-    return res.status(400).json({ success: false, message: 'Cannot record milk entry for a future date.' });
-  }
 
   const farmer = await farmerModel.findFarmerById(parsedFarmerId);
   if (!farmer) {
@@ -67,6 +62,14 @@ const addMilkEntry = asyncHandler(async (req, res) => {
     });
   }
 
+  // Permanently lock completed payments: block adding milk entries to a paid cycle
+  if (matchingCycle.status === 'paid') {
+    return res.status(409).json({
+      success: false,
+      message: 'Cannot add milk entries to a paid payment cycle.',
+    });
+  }
+
   const entry = await milkModel.createMilkEntry({
     farmerId: parsedFarmerId,
     cycleId: matchingCycle.id,
@@ -81,6 +84,137 @@ const addMilkEntry = asyncHandler(async (req, res) => {
     cycle_id: matchingCycle.id,
     rate_per_liter: matchingCycle.rate_per_liter,
   });
+});
+
+const updateMilkEntry = asyncHandler(async (req, res) => {
+  const parsedId = parsePositiveInteger(req.params.id);
+  if (!parsedId) {
+    return res.status(400).json({ success: false, message: 'Invalid milk entry ID.' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const entry = await milkModel.findMilkEntryByIdForUpdate(parsedId, client);
+    if (!entry) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Milk entry not found.' });
+    }
+
+    if (entry.cycle_status === 'paid') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot modify milk entries for a paid payment cycle.',
+      });
+    }
+
+    const { date, time, liters } = req.body;
+    let newDate = entry.date;
+    let newCycleId = entry.cycle_id;
+
+    if (date) {
+      const parsedDate = parseValidDate(date);
+      if (!parsedDate) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'date must be a valid date (YYYY-MM-DD).' });
+      }
+      newDate = toIsoDateString(parsedDate);
+
+      // Find matching cycle for new date
+      const targetCycle = await cycleModel.findCycleByFarmerAndDate(entry.farmer_id, newDate, client);
+      if (!targetCycle) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'No payment cycle exists for this farmer on the updated date.' });
+      }
+
+      if (targetCycle.status === 'paid') {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'Cannot move milk entries to a paid payment cycle.',
+        });
+      }
+
+      newCycleId = targetCycle.id;
+    }
+
+    let newTime = entry.time;
+    if (time) {
+      const normalizedTime = String(time).trim().toLowerCase();
+      if (!['morning', 'evening'].includes(normalizedTime)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'time must be morning or evening.' });
+      }
+      newTime = normalizedTime;
+    }
+
+    let newLiters = entry.liters;
+    if (liters !== undefined) {
+      const parsedLiters = parsePositiveNumber(liters);
+      if (!parsedLiters) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'liters must be greater than 0.' });
+      }
+      newLiters = parsedLiters;
+    }
+
+    const updated = await milkModel.updateMilkEntry(
+      parsedId,
+      {
+        date: newDate,
+        time: newTime,
+        liters: newLiters,
+        cycleId: newCycleId,
+      },
+      client
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, ...updated });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+const deleteMilkEntry = asyncHandler(async (req, res) => {
+  const parsedId = parsePositiveInteger(req.params.id);
+  if (!parsedId) {
+    return res.status(400).json({ success: false, message: 'Invalid milk entry ID.' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const entry = await milkModel.findMilkEntryByIdForUpdate(parsedId, client);
+    if (!entry) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Milk entry not found.' });
+    }
+
+    if (entry.cycle_status === 'paid') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot delete milk entries for a paid payment cycle.',
+      });
+    }
+
+    await milkModel.deleteMilkEntry(parsedId, client);
+    await client.query('COMMIT');
+
+    res.json({ success: true, message: 'Milk entry deleted successfully.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 const getMilkByFarmer = asyncHandler(async (req, res) => {
@@ -100,5 +234,7 @@ const getMilkByFarmer = asyncHandler(async (req, res) => {
 
 module.exports = {
   addMilkEntry,
+  updateMilkEntry,
+  deleteMilkEntry,
   getMilkByFarmer,
 };

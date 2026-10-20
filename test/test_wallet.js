@@ -608,6 +608,7 @@ async function runTests() {
   const client = await db.getClient();
 
   try {
+    await client.query("SET SESSION app.bypass_paid_locks = 'on'");
     await client.query('BEGIN');
 
     await testRecordReceipt(client);
@@ -704,6 +705,9 @@ async function runTests() {
     failed++;
     failures.push(`Unexpected error: ${err.message}`);
   } finally {
+    try {
+      await client.query("SET SESSION app.bypass_paid_locks = 'off'");
+    } catch (e) {}
     client.release();
   }
 
