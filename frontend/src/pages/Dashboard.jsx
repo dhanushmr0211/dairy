@@ -359,54 +359,20 @@ export default function Dashboard() {
             </div>
 
             {/* Wallet Quick Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--sp-4)', marginTop: '1.25rem' }}>
+            <div style={{ marginTop: '1.25rem' }}>
               {/* Balance */}
-              <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Available Wallet Balance
+              <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1.25rem 1.5rem', boxShadow: 'var(--shadow-xs)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Available Wallet Balance
+                  </div>
+                  <div style={{ fontSize: 'var(--fs-3xl)', fontWeight: 800, color: currentWalletBal > 0 ? 'var(--clr-success)' : 'var(--clr-text)', marginTop: '0.25rem' }}>
+                    ₹{currentWalletBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div style={{ fontSize: 'var(--fs-3xl)', fontWeight: 800, color: currentWalletBal > 0 ? 'var(--clr-success)' : 'var(--clr-text)', marginTop: '0.25rem' }}>
-                  ₹{currentWalletBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-dim)', fontWeight: 600 }}>
                   {currentWalletBal > 0 ? 'Ready to pay farmers' : 'Wallet empty'}
                 </div>
-              </div>
-
-              {/* Next Deposit Alert */}
-              <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Calendar size={15} strokeWidth={2.5} /> Hatsun Deposit Schedule</span>
-                </div>
-                <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--clr-text)', marginTop: '0.35rem' }}>
-                  Expected: 3rd, 13th & 23rd
-                </div>
-              </div>
-
-              {/* Distribution Proposal / Oldest Cycle */}
-              <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-accent)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Zap size={15} strokeWidth={2.5} /> Auto-Pay Status</span>
-                </div>
-                {walletInfo?.distributionProposal?.hasProposal ? (
-                  <>
-                    <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--clr-accent-dim)', marginTop: '0.25rem' }}>
-                      Can Pay ₹{Number(walletInfo.distributionProposal.proposedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem' }}>
-                      {walletInfo.distributionProposal.selectedCyclesCount} cycle(s) for {walletInfo.distributionProposal.selectedFarmersCount} farmer(s)
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--clr-text-muted)', marginTop: '0.35rem' }}>
-                      {Number(walletInfo?.balance || 0) <= 0 ? 'Insufficient wallet balance' : 'Pending cycles fit within balance'}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
-                      Oldest Unpaid: <strong>{walletInfo?.oldestUnpaidCycleDate || 'None'}</strong>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           </div>

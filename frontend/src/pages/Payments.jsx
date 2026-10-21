@@ -268,7 +268,7 @@ export default function Payments() {
       {viewTab === 'farmer' ? (
         <>
           <div className="farmer-select-bar">
-            <label className="form-label" style={{ marginBottom: 0 }}>Select Farmer:</label>
+            <label className="form-label" style={{ marginBottom: 0, color: '#0f172a', fontWeight: 700 }}>Select Farmer:</label>
             <select
               className="form-select"
               value={selectedFarmerId}
@@ -288,7 +288,7 @@ export default function Payments() {
               <div className="card-header">
                 <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Rocket size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Start / Schedule Billing Cycle</h3>
               </div>
-              <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-xs)', marginBottom: '1rem' }}>
+              <p style={{ color: '#334155', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem', fontWeight: 500, lineHeight: 1.5 }}>
                 You can create next consecutive cycles (e.g. Oct 16–30 after Oct 1–15) even if previous cycles are unsettled. Overlapping dates are prevented.
               </p>
               <form onSubmit={handleStartCycle}>

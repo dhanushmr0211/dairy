@@ -200,9 +200,8 @@ export default function MilkEntries() {
         )}
       </div>
 
-      {/* ── Two Column Spacious Layout: Entry Form + Quick Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem', marginBottom: '2rem' }}>
-        {/* Main Milk Entry Card */}
+      {/* ── Main Milk Entry Form Card ── */}
+      <div style={{ marginBottom: '2rem' }}>
         <div 
           className="card"
           style={{
@@ -376,67 +375,6 @@ export default function MilkEntries() {
             </button>
           </form>
         </div>
-
-        {/* Collection Summary & Farmer Info */}
-        <div 
-          className="card"
-          style={{
-            padding: '1.75rem',
-            borderRadius: 'var(--radius-xl)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-            border: '1px solid var(--clr-border)',
-            boxShadow: 'var(--shadow-sm)'
-          }}
-        >
-          <div>
-            <div className="card-header" style={{ marginBottom: '1.25rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.75rem' }}>
-              <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <BarChart3 size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Collection Summary
-              </h3>
-            </div>
-
-            <div style={{ marginBottom: '1.25rem', padding: '1rem', background: '#ffffff', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
-                Selected Farmer
-              </div>
-              <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--clr-text)', marginTop: '0.25rem' }}>
-                {selectedFarmer?.name || 'None selected'}
-              </div>
-              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', marginTop: '0.15rem' }}>
-                <Phone size={14} strokeWidth={2.5} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} /> {selectedFarmer?.phone || "—"}
-              </div>
-            </div>
-
-            <p style={{ color: 'var(--clr-text-secondary)', fontSize: 'var(--fs-sm)', lineHeight: 1.6 }}>
-              Milk entered here is automatically assigned to {selectedFarmer?.name || 'this farmer'}&apos;s current active billing cycle.
-            </p>
-          </div>
-
-          <div 
-            style={{ 
-              marginTop: '1.5rem', 
-              padding: '1.25rem', 
-              background: '#ecfdf5', 
-              border: '2px solid #a7f3d0', 
-              borderRadius: 'var(--radius-lg)',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: '#047857', textTransform: 'uppercase' }}>
-              Total Milk Recorded for this Farmer
-            </div>
-            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#059669', marginTop: '0.25rem' }}>
-              {entries.reduce((acc, curr) => acc + Number(curr.liters || 0), 0).toFixed(2)}{' '}
-              <span style={{ fontSize: '1.25rem' }}>L</span>
-            </div>
-            <div style={{ fontSize: 'var(--fs-xs)', color: '#065f46', marginTop: '0.25rem' }}>
-              Across {entries.length} recorded collection entries
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ── Milk History Records Table (1 Row Per Date with Morning & Evening Columns) ── */}
@@ -569,6 +507,63 @@ export default function MilkEntries() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* ── Collection Summary (Placed After Milk History Table) ── */}
+      <div 
+        className="card"
+        style={{
+          marginTop: '2rem',
+          padding: '1.75rem',
+          borderRadius: 'var(--radius-xl)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          border: '1px solid var(--clr-border)',
+          boxShadow: 'var(--shadow-sm)'
+        }}
+      >
+        <div className="card-header" style={{ marginBottom: '1.25rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+          <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-text)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <BarChart3 size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Collection Summary
+          </h3>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'center' }}>
+          <div style={{ padding: '1.25rem', background: '#ffffff', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+              Selected Farmer
+            </div>
+            <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 800, color: 'var(--clr-text)', marginTop: '0.25rem' }}>
+              {selectedFarmer?.name || 'None selected'}
+            </div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Phone size={14} strokeWidth={2.5} /> {selectedFarmer?.phone || "—"}
+            </div>
+            <p style={{ color: 'var(--clr-text-secondary)', fontSize: 'var(--fs-xs)', lineHeight: 1.5, marginTop: '0.75rem', marginBottom: 0 }}>
+              Milk entered here is automatically assigned to {selectedFarmer?.name || 'this farmer'}&apos;s current active billing cycle.
+            </p>
+          </div>
+
+          <div 
+            style={{ 
+              padding: '1.5rem', 
+              background: '#ecfdf5', 
+              border: '2px solid #a7f3d0', 
+              borderRadius: 'var(--radius-lg)',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: '#047857', textTransform: 'uppercase' }}>
+              Total Milk Recorded for this Farmer
+            </div>
+            <div style={{ fontSize: '2.5rem', fontWeight: 800, color: '#059669', marginTop: '0.25rem' }}>
+              {entries.reduce((acc, curr) => acc + Number(curr.liters || 0), 0).toFixed(2)}{' '}
+              <span style={{ fontSize: '1.25rem' }}>L</span>
+            </div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: '#065f46', marginTop: '0.25rem' }}>
+              Across {entries.length} recorded collection entries ({dailyEntries.length} active collection days)
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

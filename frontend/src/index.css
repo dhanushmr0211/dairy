@@ -410,18 +410,19 @@ a:hover {
 .form-label {
   font-size: var(--fs-xs);
   font-weight: 600;
-  color: var(--clr-text-secondary);
+  color: #1e293b;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
 .form-input, .form-select {
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
   border-radius: var(--radius-sm);
-  padding: 0.65rem 0.85rem;
-  font-size: var(--fs-sm);
-  color: var(--clr-text);
+  padding: 0.75rem 0.95rem;
+  font-size: var(--fs-base);
+  color: #0f172a;
+  font-weight: 600;
   font-family: var(--ff-body);
   outline: none;
   box-shadow: var(--shadow-xs);
@@ -435,12 +436,35 @@ a:hover {
 }
 
 .form-input::placeholder {
-  color: var(--clr-text-dim);
+  color: #64748b;
+  font-weight: 500;
 }
 
 .form-select option {
   background: #ffffff;
-  color: var(--clr-text);
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* Ensure WebKit / Mobile browsers render date inputs dark and crisp */
+input[type="date"] {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: #0f172a;
+  font-weight: 600;
 }
 
 /* ═══ Buttons (Modern, Tactile, High-Contrast) ═══ */

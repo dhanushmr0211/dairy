@@ -52,6 +52,23 @@ export default function Layout({ children }) {
         <Menu size={22} strokeWidth={2.5} />
       </button>
 
+      {/* Mobile backdrop overlay: click anywhere on empty screen to close sidebar */}
+      {mobileOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={closeMobile}
+          aria-label="Close menu"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 99,
+            cursor: 'pointer',
+          }}
+        />
+      )}
+
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
