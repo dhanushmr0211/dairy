@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Users, Milk, AlertTriangle, Hourglass, CreditCard, Landmark, Plus, Zap, Calendar, X, ClipboardList, Search, Bell, RotateCcw, Phone, Wheat, ArrowDownLeft, ArrowUpRight, Scale, Minus, BarChart3, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
   getDashboard, 
@@ -154,7 +155,7 @@ export default function Dashboard() {
         paidDate: todayIso,
       });
 
-      showToast(`✓ Successfully settled ${res.cycleCount} cycle(s) for ${res.farmerCount} farmer(s)! Total Paid: ₹${res.totalAmount}`);
+      showToast(`Successfully settled ${res.cycleCount} cycle(s) for ${res.farmerCount} farmer(s)! Total Paid: ₹${res.totalAmount}`);
       setSelectedCycleIds([]);
       setCalcResult(null);
       setConfirmModalOpen(false);
@@ -187,7 +188,7 @@ export default function Dashboard() {
       });
 
       const updatedBal = res.newBalance ?? res.availableBalance ?? res.walletBalance ?? 0;
-      showToast(`✓ Transaction recorded! New Wallet Balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
+      showToast(`Transaction recorded! New Wallet Balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
       setReceiptModalOpen(false);
       setReceiptAmount('');
       setReceiptRef('');
@@ -226,7 +227,7 @@ export default function Dashboard() {
         previewHash: distPreview.previewHash,
       });
 
-      showToast(`✓ Automatic distribution confirmed! Settled ${res.selectedCycleCount} cycle(s) across ${res.selectedFarmerCount} farmer(s). Total: ₹${Number(res.totalDisbursed).toLocaleString('en-IN')}`);
+      showToast(`Automatic distribution confirmed! Settled ${res.selectedCycleCount} cycle(s) across ${res.selectedFarmerCount} farmer(s). Total: ₹${Number(res.totalDisbursed).toLocaleString('en-IN')}`);
       setAutoDistModalOpen(false);
       setDistPreview(null);
       loadDashboard();
@@ -253,7 +254,7 @@ export default function Dashboard() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button className="btn btn-outline btn-sm" onClick={loadDashboard}>
-            <span>🔄</span> Refresh
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><RotateCcw size={15} strokeWidth={2.5} /> Refresh</span>
           </button>
         </div>
       </div>
@@ -276,7 +277,7 @@ export default function Dashboard() {
             <div className="stat-card primary">
               <div className="stat-label">Active Farmers</div>
               <div className="stat-value">{data?.active_farmer_count ?? data?.total_farmers ?? 0}</div>
-              <div className="stat-icon">👨‍🌾</div>
+              <div className="stat-icon"><Users size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card success">
@@ -286,15 +287,15 @@ export default function Dashboard() {
                 <span style={{ fontSize: '1rem', fontWeight: 600 }}>L</span>
               </div>
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', display: 'flex', gap: '0.75rem' }}>
-                <span>🌅 Morn: <strong>{Number(data?.today_morning_milk || 0).toFixed(1)}L</strong></span>
-                <span>🌆 Eve: <strong>{Number(data?.today_evening_milk || 0).toFixed(1)}L</strong></span>
+                <span>Morn: <strong>{Number(data?.today_morning_milk || 0).toFixed(1)}L</strong></span>
+                <span>Eve: <strong>{Number(data?.today_evening_milk || 0).toFixed(1)}L</strong></span>
               </div>
-              <div className="stat-icon">🥛</div>
+              <div className="stat-icon"><Milk size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card warning" style={Number(data?.overdue_amount || 0) > 0 ? { borderColor: 'var(--clr-danger)' } : {}}>
               <div className="stat-label" style={{ color: Number(data?.overdue_amount || 0) > 0 ? 'var(--clr-danger)' : undefined }}>
-                ⚠️ Overdue Amount
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={15} strokeWidth={2.5} /> Overdue Amount</span>
               </div>
               <div className="stat-value" style={{ color: Number(data?.overdue_amount || 0) > 0 ? 'var(--clr-danger)' : undefined }}>
                 ₹{Number(data?.overdue_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -302,7 +303,7 @@ export default function Dashboard() {
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 {data?.overdue_farmers ?? 0} cycle{(data?.overdue_farmers ?? 0) === 1 ? '' : 's'} past due date
               </div>
-              <div className="stat-icon">⏳</div>
+              <div className="stat-icon"><Hourglass size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card accent">
@@ -313,7 +314,7 @@ export default function Dashboard() {
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Across {data?.active_cycles_count ?? 0} active/unpaid cycle{(data?.active_cycles_count ?? 0) === 1 ? '' : 's'}
               </div>
-              <div className="stat-icon">💰</div>
+              <div className="stat-icon"><CreditCard size={28} strokeWidth={2.5} /></div>
             </div>
           </div>
 
@@ -331,7 +332,7 @@ export default function Dashboard() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--clr-border)', paddingBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.4rem' }}>🏦</span>
+                <Landmark size={24} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} />
                 <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-primary-dim)', margin: 0 }}>
                   Dairy Company Wallet
                 </h3>
@@ -342,14 +343,14 @@ export default function Dashboard() {
                   className="btn btn-primary btn-sm"
                   onClick={() => setReceiptModalOpen(true)}
                 >
-                  ➕ Record Received Payment
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Plus size={15} strokeWidth={2.5} /> Record Received Payment</span>
                 </button>
                 <button 
                   className="btn btn-success btn-sm"
                   onClick={() => handleOpenAutoDistribution('BELOW_BALANCE')}
                   disabled={currentWalletBal <= 0}
                 >
-                  ⚡ Auto-Distribute
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Zap size={15} strokeWidth={2.5} /> Auto-Distribute</span>
                 </button>
                 <Link to="/wallet" className="btn btn-outline btn-sm">
                   Full Ledger →
@@ -375,7 +376,7 @@ export default function Dashboard() {
               {/* Next Deposit Alert */}
               <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  📅 Hatsun Deposit Schedule
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Calendar size={15} strokeWidth={2.5} /> Hatsun Deposit Schedule</span>
                 </div>
                 <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--clr-text)', marginTop: '0.35rem' }}>
                   Expected: 3rd, 13th & 23rd
@@ -385,7 +386,7 @@ export default function Dashboard() {
               {/* Distribution Proposal / Oldest Cycle */}
               <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-accent)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  ⚡ Auto-Pay Status
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Zap size={15} strokeWidth={2.5} /> Auto-Pay Status</span>
                 </div>
                 {walletInfo?.distributionProposal?.hasProposal ? (
                   <>
@@ -426,7 +427,7 @@ export default function Dashboard() {
               <div className="card-header" style={{ borderBottom: '1px solid var(--clr-border)', paddingBottom: '1rem' }}>
                 <div>
                   <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    ⚡ Real-Time Live Settlement Calculator
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Zap size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Real-Time Live Settlement Calculator</span>
                     {calculating && <span className="spinner" style={{ width: 16, height: 16 }}></span>}
                   </h3>
                   <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem' }}>
@@ -439,7 +440,7 @@ export default function Dashboard() {
                     className="btn btn-outline btn-sm"
                     onClick={() => setSelectedCycleIds([])}
                   >
-                    ✕ Clear Selection
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><X size={15} strokeWidth={2.5} /> Clear Selection</span>
                   </button>
                   <button
                     className="btn btn-success"
@@ -447,7 +448,7 @@ export default function Dashboard() {
                     disabled={calculating || paying}
                     style={{ fontWeight: 700, padding: '0.5rem 1.25rem', fontSize: 'var(--fs-sm)' }}
                   >
-                    💳 Confirm & Pay ₹{Number(calcResult?.selected?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><CreditCard size={16} strokeWidth={2.5} /> Confirm & Pay ₹{Number(calcResult?.selected?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </button>
                 </div>
               </div>
@@ -546,7 +547,7 @@ export default function Dashboard() {
           <div className="card" style={{ marginBottom: 'var(--sp-8)' }}>
             <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h3 className="card-title">📋 Farmers Billing Cycles & Payout Progress</h3>
+                <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><ClipboardList size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Farmers Billing Cycles & Payout Progress</h3>
                 <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
                   Select one or more cycles to activate real-time calculation and execute instant settlements
                 </p>
@@ -556,7 +557,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   type="text"
-                  placeholder="🔍 Search farmer name / phone..."
+                  placeholder="Search farmer name / phone..."
                   className="form-input"
                   style={{ width: 220, padding: '0.4rem 0.65rem', fontSize: 'var(--fs-xs)' }}
                   value={searchQuery}
@@ -570,9 +571,9 @@ export default function Dashboard() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="all">All Statuses ({allCycles.length})</option>
-                  <option value="overdue">🚨 Overdue Only ({data?.overdue_farmers || 0})</option>
-                  <option value="due_today">🔔 Due Today ({data?.farmers_due_today || 0})</option>
-                  <option value="upcoming">📅 Upcoming ({data?.upcoming_payment_count || 0})</option>
+                  <option value="overdue">Overdue Only ({data?.overdue_farmers || 0})</option>
+                  <option value="due_today">Due Today ({data?.farmers_due_today || 0})</option>
+                  <option value="upcoming">Upcoming ({data?.upcoming_payment_count || 0})</option>
                 </select>
 
                 {selectedCycleIds.length > 0 && (
@@ -585,7 +586,7 @@ export default function Dashboard() {
 
             {filteredCycles.length === 0 ? (
               <div className="empty-state">
-                <div className="icon">🔄</div>
+                <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><RotateCcw size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
                 <p>No billing cycles match your filter criteria.</p>
                 {searchQuery && (
                   <button className="btn btn-outline btn-sm" onClick={() => { setSearchQuery(''); setStatusFilter('all'); }} style={{ marginTop: '0.5rem' }}>
@@ -648,7 +649,7 @@ export default function Dashboard() {
                           <td>
                             <strong>{item.farmerName}</strong>
                             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-                              📞 {item.farmerPhone}
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Phone size={13} strokeWidth={2.5} /> {item.farmerPhone}</span>
                             </div>
                             {farmerCyclesCount > 1 && (
                               <button
@@ -696,7 +697,7 @@ export default function Dashboard() {
                                   className="badge"
                                   style={{ background: 'var(--clr-danger-light)', color: 'var(--clr-danger)', border: '1px solid var(--clr-danger-border)', fontWeight: 700 }}
                                 >
-                                  ⚠️ {item.overdueDays} Days Overdue
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={13} strokeWidth={2.5} /> {item.overdueDays} Days Overdue</span>
                                 </span>
                                 <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
                                   Due: {new Date(item.paymentDueDate).toLocaleDateString()}
@@ -704,7 +705,7 @@ export default function Dashboard() {
                               </div>
                             ) : item.isDueToday ? (
                               <span className="badge badge-morning" style={{ fontWeight: 700 }}>
-                                🔔 Due Today
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Bell size={13} strokeWidth={2.5} /> Due Today</span>
                               </span>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -730,27 +731,27 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-6)' }}>
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">⚡ Quick Management Actions</h3>
+                <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Zap size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Quick Management Actions</h3>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <Link to="/milk" className="btn btn-primary" style={{ justifyContent: 'flex-start' }}>
-                  <span>🥛</span> Record Daily Milk Entry
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}><Milk size={18} strokeWidth={2.5} /> Record Daily Milk Entry</span>
                 </Link>
                 <Link to="/feed" className="btn btn-outline" style={{ justifyContent: 'flex-start' }}>
-                  <span>🌾</span> Add Cattle Feed Sale
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}><Wheat size={18} strokeWidth={2.5} /> Add Cattle Feed Sale</span>
                 </Link>
                 <Link to="/payments" className="btn btn-success" style={{ justifyContent: 'flex-start' }}>
-                  <span>💳</span> Start New Billing Cycles & Payments
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}><CreditCard size={18} strokeWidth={2.5} /> Start New Billing Cycles & Payments</span>
                 </Link>
                 <Link to="/farmers" className="btn btn-outline" style={{ justifyContent: 'flex-start' }}>
-                  <span>➕</span> Register New Farmer
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}><Plus size={18} strokeWidth={2.5} /> Register New Farmer</span>
                 </Link>
               </div>
             </div>
 
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">📊 Settlements Breakdown</h3>
+                <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><BarChart3 size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Settlements Breakdown</h3>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--clr-border)' }}>
@@ -785,7 +786,7 @@ export default function Dashboard() {
       {confirmModalOpen && calcResult && (
         <div className="modal-overlay" onClick={() => setConfirmModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 550 }}>
-            <h3>💳 Confirm Payment Settlement</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><CreditCard size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Confirm Payment Settlement</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
               You are about to execute payment for <strong>{calcResult.selected.cycleCount} cycle(s)</strong> across <strong>{calcResult.selected.farmerCount} farmer(s)</strong>.
             </p>
@@ -838,7 +839,7 @@ export default function Dashboard() {
       {receiptModalOpen && (
         <div className="modal-overlay" onClick={() => setReceiptModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🏦 Record Received Company Deposit</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Landmark size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Record Received Company Deposit</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
               Record funds received from Hatsun into the dairy company wallet. Expected payment dates are informational; only confirmed receipts are credited.
             </p>
@@ -852,9 +853,9 @@ export default function Dashboard() {
                   value={txType}
                   onChange={(e) => setTxType(e.target.value)}
                 >
-                  <option value="receipt">📥 Deposit from Hatsun (Payment Received - Credits Wallet)</option>
-                  <option value="adjustment">⚖️ Balance Adjustment / Initial Deposit</option>
-                  <option value="farmer_payment">📤 Direct Farmer Payout / Debit (Deducts from Wallet)</option>
+                  <option value="receipt">Deposit from Hatsun (Payment Received - Credits Wallet)</option>
+                  <option value="adjustment">Balance Adjustment / Initial Deposit</option>
+                  <option value="farmer_payment">Direct Farmer Payout / Debit (Deducts from Wallet)</option>
                 </select>
               </div>
 
@@ -871,7 +872,7 @@ export default function Dashboard() {
                         checked={adjustmentDirection === 'credit'} 
                         onChange={() => setAdjustmentDirection('credit')}
                       />
-                      ➕ Add Funds (Credit)
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Plus size={14} strokeWidth={2.5} /> Add Funds (Credit)</span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
                       <input 
@@ -881,7 +882,7 @@ export default function Dashboard() {
                         checked={adjustmentDirection === 'debit'} 
                         onChange={() => setAdjustmentDirection('debit')}
                       />
-                      ➖ Deduct Funds (Debit)
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Minus size={14} strokeWidth={2.5} /> Deduct Funds (Debit)</span>
                     </label>
                   </div>
                 </div>
@@ -962,7 +963,7 @@ export default function Dashboard() {
       {autoDistModalOpen && (
         <div className="modal-overlay" onClick={() => setAutoDistModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <h3>⚡ Automatic Payment Distribution</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Zap size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Automatic Payment Distribution</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1rem' }}>
               Automatically select oldest unpaid cycles within available company wallet balance.
             </p>
@@ -1008,13 +1009,13 @@ export default function Dashboard() {
 
                 {distPreview.shortfall > 0 && (
                   <div style={{ background: 'var(--clr-warning-light)', border: '1px solid var(--clr-warning-border)', borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-warning-dim)' }}>
-                    ⚠️ Shortfall of ₹{Number(distPreview.shortfall).toFixed(2)} covered by ₹500 tolerance margin.
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><AlertTriangle size={16} strokeWidth={2.5} /> Shortfall of ₹{Number(distPreview.shortfall).toFixed(2)} covered by ₹500 tolerance margin.</span>
                   </div>
                 )}
 
                 {distPreview.nextUnselectedReason && (
                   <div style={{ background: 'var(--clr-surface-alt)', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem', marginBottom: '1rem', fontSize: '0.75rem', color: 'var(--clr-text-muted)' }}>
-                    ℹ️ <strong>Selection cutoff reason:</strong> {distPreview.nextUnselectedReason}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Info size={14} strokeWidth={2.5} /> <strong>Selection cutoff reason:</strong></span> {distPreview.nextUnselectedReason}
                   </div>
                 )}
 

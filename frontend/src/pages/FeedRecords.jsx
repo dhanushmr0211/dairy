@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Wheat, Info, RotateCcw } from 'lucide-react';
 import { getFarmers, addFeedRecord, getFeedByFarmer } from '../api';
 import { useToast } from '../context/ToastContext';
 
@@ -108,7 +109,7 @@ export default function FeedRecords() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--sp-6)', marginBottom: 'var(--sp-8)' }}>
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">🌾 Issue Feed / Supply</h3>
+            <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Wheat size={20} strokeWidth={2.5} style={{ color: "var(--clr-accent)" }} /> Issue Feed / Supply</h3>
           </div>
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
@@ -176,7 +177,7 @@ export default function FeedRecords() {
 
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">ℹ️ Deduction Overview</h3>
+            <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Info size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Deduction Overview</h3>
           </div>
           <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.5rem' }}>
             Feed records dated within an active cycle are automatically deducted from the milk payout at settlement.
@@ -210,7 +211,7 @@ export default function FeedRecords() {
           </div>
         ) : records.length === 0 ? (
           <div className="empty-state">
-            <div className="icon">🌾</div>
+            <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><Wheat size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
             <p>No feed records found for this farmer.</p>
           </div>
         ) : (

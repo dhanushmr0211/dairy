@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
@@ -16,9 +17,13 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {toast && (
-        <div className={`toast toast-${toast.type}`}>
-          {toast.type === 'success' ? '✓ ' : '✕ '}
-          {toast.message}
+        <div className={`toast toast-${toast.type}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          {toast.type === 'success' ? (
+            <CheckCircle2 size={18} strokeWidth={2.5} />
+          ) : (
+            <AlertCircle size={18} strokeWidth={2.5} />
+          )}
+          <span>{toast.message}</span>
         </div>
       )}
     </ToastContext.Provider>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Landmark, ArrowDownLeft, ArrowUpRight, Scale, RotateCcw, Calendar, FileText, Zap, CreditCard, AlertTriangle, Plus, Minus } from 'lucide-react';
 import { 
   getWalletSummary, 
   getWalletTransactions, 
@@ -85,7 +86,7 @@ export default function Wallet() {
       });
 
       const updatedBal = res.newBalance ?? res.availableBalance ?? res.walletBalance ?? 0;
-      showToast(`✓ Transaction recorded! New wallet balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
+      showToast(`Transaction recorded! New wallet balance: ₹${Number(updatedBal).toLocaleString('en-IN')}`);
       setReceiptModalOpen(false);
       setReceiptAmount('');
       setReceiptRef('');
@@ -122,7 +123,7 @@ export default function Wallet() {
         previewHash: distPreview.previewHash,
       });
 
-      showToast(`✓ Automatic payment distribution complete! Settled ${res.selectedCycleCount} cycles across ${res.selectedFarmerCount} farmers. Disbursed: ₹${Number(res.totalDisbursed).toLocaleString('en-IN')}`);
+      showToast(`Automatic payment distribution complete! Settled ${res.selectedCycleCount} cycles across ${res.selectedFarmerCount} farmers. Disbursed: ₹${Number(res.totalDisbursed).toLocaleString('en-IN')}`);
       setDistModalOpen(false);
       setDistPreview(null);
       loadData();
@@ -163,17 +164,17 @@ export default function Wallet() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)}>
-            <span>➕</span> Record Received Payment
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Plus size={16} strokeWidth={2.5} /> Record Received Payment</span>
           </button>
           <button 
             className="btn btn-success btn-sm" 
             onClick={() => handleOpenDistributionPreview('BELOW_BALANCE')}
             disabled={availableBal <= 0}
           >
-            <span>⚡</span> Auto-Distribute
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Zap size={16} strokeWidth={2.5} /> Auto-Distribute</span>
           </button>
           <button className="btn btn-outline btn-sm" onClick={loadData}>
-            <span>🔄</span> Refresh
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><RotateCcw size={16} strokeWidth={2.5} /> Refresh</span>
           </button>
         </div>
       </div>
@@ -199,7 +200,7 @@ export default function Wallet() {
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 {availableBal > 0 ? 'Funds available for distribution' : 'Wallet balance empty'}
               </div>
-              <div className="stat-icon">🏦</div>
+              <div className="stat-icon"><Landmark size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card primary">
@@ -210,7 +211,7 @@ export default function Wallet() {
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Lifetime confirmed deposits
               </div>
-              <div className="stat-icon">📥</div>
+              <div className="stat-icon"><ArrowDownLeft size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card accent">
@@ -221,7 +222,7 @@ export default function Wallet() {
               <div style={{ marginTop: '0.4rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)' }}>
                 Lifetime farmer cycle payouts
               </div>
-              <div className="stat-icon">📤</div>
+              <div className="stat-icon"><ArrowUpRight size={28} strokeWidth={2.5} /></div>
             </div>
 
             <div className="stat-card warning">
@@ -254,7 +255,7 @@ export default function Wallet() {
             }}
           >
             <div style={{ fontWeight: 700, color: 'var(--clr-primary-dim)', fontSize: 'var(--fs-sm)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>📅</span> Hatsun Deposit Schedule: 3rd, 13th & 23rd of each month
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Calendar size={18} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Hatsun Deposit Schedule: 3rd, 13th & 23rd of each month</span>
             </div>
           </div>
 
@@ -264,13 +265,13 @@ export default function Wallet() {
               className={`btn btn-sm ${activeTab === 'ledger' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveTab('ledger')}
             >
-              📜 Wallet Transaction Ledger ({transactions.length})
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><FileText size={18} strokeWidth={2.5} /> Wallet Transaction Ledger ({transactions.length})</span>
             </button>
             <button
               className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveTab('history')}
             >
-              ⚡ Automatic Distribution History ({distHistory.length})
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Zap size={18} strokeWidth={2.5} /> Automatic Distribution History ({distHistory.length})</span>
             </button>
           </div>
 
@@ -293,16 +294,16 @@ export default function Wallet() {
                     onChange={(e) => setTxTypeFilter(e.target.value)}
                   >
                     <option value="">All Transactions</option>
-                    <option value="receipt">📥 Receipts Only (Credits)</option>
-                    <option value="farmer_payment">📤 Farmer Payments (Debits)</option>
-                    <option value="adjustment">⚖️ Adjustments</option>
+                    <option value="receipt">Receipts Only (Credits)</option>
+                    <option value="farmer_payment">Farmer Payments (Debits)</option>
+                    <option value="adjustment">Adjustments</option>
                   </select>
                 </div>
               </div>
 
               {transactions.length === 0 ? (
                 <div className="empty-state">
-                  <div className="icon">💳</div>
+                  <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><CreditCard size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
                   <p>No transactions recorded yet in the company wallet ledger.</p>
                   <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)} style={{ marginTop: '0.75rem' }}>
                     Record First Deposit
@@ -340,11 +341,11 @@ export default function Wallet() {
                             </td>
                             <td>
                               {isCredit ? (
-                                <span className="badge badge-active">📥 Receipt</span>
+                                <span className="badge badge-active" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><ArrowDownLeft size={14} strokeWidth={2.5} /> Receipt</span>
                               ) : isDebit ? (
-                                <span className="badge badge-paid">📤 Farmer Payment</span>
+                                <span className="badge badge-paid" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><ArrowUpRight size={14} strokeWidth={2.5} /> Farmer Payment</span>
                               ) : (
-                                <span className="badge badge-morning">⚖️ Adjustment</span>
+                                <span className="badge badge-morning" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Scale size={14} strokeWidth={2.5} /> Adjustment</span>
                               )}
                             </td>
                             <td>
@@ -391,7 +392,7 @@ export default function Wallet() {
 
               {distHistory.length === 0 ? (
                 <div className="empty-state">
-                  <div className="icon">⚡</div>
+                  <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><Zap size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
                   <p>No automatic distributions have been executed yet.</p>
                 </div>
               ) : (
@@ -450,7 +451,7 @@ export default function Wallet() {
       {receiptModalOpen && (
         <div className="modal-overlay" onClick={() => setReceiptModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🏦 Record Payment / Transaction</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Landmark size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Record Payment / Transaction</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
               Select the transaction type below to credit received funds from Hatsun or record adjustments.
             </p>
@@ -464,9 +465,9 @@ export default function Wallet() {
                   value={txType}
                   onChange={(e) => setTxType(e.target.value)}
                 >
-                  <option value="receipt">📥 Deposit from Hatsun (Payment Received - Credits Wallet)</option>
-                  <option value="adjustment">⚖️ Balance Adjustment / Initial Deposit</option>
-                  <option value="farmer_payment">📤 Direct Farmer Payout / Debit (Deducts from Wallet)</option>
+                  <option value="receipt">Deposit from Hatsun (Payment Received - Credits Wallet)</option>
+                  <option value="adjustment">Balance Adjustment / Initial Deposit</option>
+                  <option value="farmer_payment">Direct Farmer Payout / Debit (Deducts from Wallet)</option>
                 </select>
               </div>
 
@@ -483,7 +484,7 @@ export default function Wallet() {
                         checked={adjustmentDirection === 'credit'} 
                         onChange={() => setAdjustmentDirection('credit')}
                       />
-                      ➕ Add Funds to Wallet (Credit)
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Plus size={14} strokeWidth={2.5} /> Add Funds to Wallet (Credit)</span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 'var(--fs-sm)' }}>
                       <input 
@@ -493,7 +494,7 @@ export default function Wallet() {
                         checked={adjustmentDirection === 'debit'} 
                         onChange={() => setAdjustmentDirection('debit')}
                       />
-                      ➖ Deduct Funds from Wallet (Debit)
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Minus size={14} strokeWidth={2.5} /> Deduct Funds from Wallet (Debit)</span>
                     </label>
                   </div>
                 </div>
@@ -580,7 +581,7 @@ export default function Wallet() {
       {distModalOpen && (
         <div className="modal-overlay" onClick={() => setDistModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <h3>⚡ Automatic Payment Distribution</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Zap size={22} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Automatic Payment Distribution</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1rem' }}>
               Selects oldest unpaid cycles across all farmers matching the available company wallet balance.
             </p>
@@ -625,7 +626,7 @@ export default function Wallet() {
 
                 {distPreview.shortfall > 0 && (
                   <div style={{ background: 'var(--clr-warning-light)', border: '1px solid var(--clr-warning-border)', borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: 'var(--fs-xs)', color: 'var(--clr-warning-dim)' }}>
-                    ⚠️ Shortfall of ₹{Number(distPreview.shortfall).toFixed(2)} covered by ₹500 tolerance margin.
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><AlertTriangle size={16} strokeWidth={2.5} /> Shortfall of ₹{Number(distPreview.shortfall).toFixed(2)} covered by ₹500 tolerance margin.</span>
                   </div>
                 )}
 

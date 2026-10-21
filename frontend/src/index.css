@@ -108,7 +108,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -842,10 +842,15 @@ a:hover {
     transform: translateX(0);
   }
 
+  .top-header-bar {
+    margin-left: 0 !important;
+    padding-left: 4.5rem !important;
+  }
+
   .main-content {
     margin-left: 0;
     padding: var(--sp-6) var(--sp-4);
-    padding-top: calc(var(--sp-6) + 48px);
+    padding-top: var(--sp-6);
   }
 
   .mobile-menu-btn {

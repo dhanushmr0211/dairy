@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { UserPlus, FileText, Users, BarChart3, RotateCcw } from 'lucide-react';
 import { getFarmers, createFarmer, getFarmerSummary } from '../api';
 import { useToast } from '../context/ToastContext';
 
@@ -72,7 +73,7 @@ export default function Farmers() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--sp-6)', marginBottom: 'var(--sp-8)' }}>
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">➕ Register New Farmer</h3>
+            <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><UserPlus size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Register New Farmer</h3>
           </div>
           <form onSubmit={handleCreate}>
             <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -106,7 +107,7 @@ export default function Farmers() {
         {selectedSummary && (
           <div className="card" style={{ borderColor: 'var(--clr-primary)' }}>
             <div className="card-header">
-              <h3 className="card-title">📄 Active Summary: {selectedSummary.farmer?.name}</h3>
+              <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><FileText size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Active Summary: {selectedSummary.farmer?.name}</h3>
               <button className="btn btn-outline btn-sm" onClick={() => setSelectedSummary(null)}>Close</button>
             </div>
             <div className="summary-row">
@@ -146,7 +147,7 @@ export default function Farmers() {
           </div>
         ) : farmers.length === 0 ? (
           <div className="empty-state">
-            <div className="icon">👨‍🌾</div>
+            <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><Users size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
             <p>No farmers registered yet. Add your first farmer above.</p>
           </div>
         ) : (
@@ -174,7 +175,7 @@ export default function Farmers() {
                         onClick={() => handleViewSummary(farmer.id)}
                         disabled={loadingSummary}
                       >
-                        📊 View Summary
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><BarChart3 size={15} strokeWidth={2.5} /> View Summary</span>
                       </button>
                     </td>
                   </tr>

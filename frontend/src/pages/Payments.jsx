@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Users, ClipboardList, Rocket, CreditCard, Pencil, RotateCcw, AlertTriangle, Calendar, Save, CheckCircle2 } from 'lucide-react';
 import {
   getFarmers,
   getCyclesByFarmer,
@@ -253,13 +254,13 @@ export default function Payments() {
             className={`btn ${viewTab === 'farmer' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setViewTab('farmer')}
           >
-            👨‍🌾 By Farmer
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Users size={16} strokeWidth={2.5} /> By Farmer</span>
           </button>
           <button
             className={`btn ${viewTab === 'queue' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setViewTab('queue')}
           >
-            📋 All Unpaid Queue
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><ClipboardList size={16} strokeWidth={2.5} /> All Unpaid Queue</span>
           </button>
         </div>
       </div>
@@ -285,7 +286,7 @@ export default function Payments() {
             {/* Start New Cycle Form */}
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">🚀 Start / Schedule Billing Cycle</h3>
+                <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Rocket size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Start / Schedule Billing Cycle</h3>
               </div>
               <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-xs)', marginBottom: '1rem' }}>
                 You can create next consecutive cycles (e.g. Oct 16–30 after Oct 1–15) even if previous cycles are unsettled. Overlapping dates are prevented.
@@ -344,7 +345,7 @@ export default function Payments() {
             {/* Quick Summary of Unsettled Cycles for this farmer */}
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">💳 Pending Settlements ({unpaidCycles.length})</h3>
+                <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><CreditCard size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Pending Settlements ({unpaidCycles.length})</h3>
                 {selectedCycleIds.length > 0 && (
                   <button
                     className="btn btn-success btn-sm"
@@ -399,7 +400,7 @@ export default function Payments() {
                             title="Edit Rate or Duration"
                             onClick={() => handleOpenEdit(c)}
                           >
-                            ✏️ Edit
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span>
                           </button>
                           <button
                             className="btn btn-outline btn-sm"
@@ -438,7 +439,7 @@ export default function Payments() {
               </div>
             ) : cycles.length === 0 ? (
               <div className="empty-state">
-                <div className="icon">🔄</div>
+                <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><RotateCcw size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
                 <p>No cycles created for this farmer yet. Create one above.</p>
               </div>
             ) : (
@@ -491,7 +492,7 @@ export default function Payments() {
                         </td>
                         <td>
                           {c.isPaid ? (
-                            <span className="badge badge-paid">✓ PAID</span>
+                            <span className="badge badge-paid" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><CheckCircle2 size={13} strokeWidth={2.5} /> PAID</span>
                           ) : (
                             <span className="badge badge-active">PENDING</span>
                           )}
@@ -505,14 +506,14 @@ export default function Payments() {
                                 title="Edit Rate or Duration"
                                 onClick={() => handleOpenEdit(c)}
                               >
-                                ✏️ Edit
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span>
                               </button>
                               <button
                                 className="btn btn-success btn-sm"
                                 style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
                                 onClick={() => handleOpenPreview(c.id)}
                               >
-                                💳 Settle
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><CreditCard size={13} strokeWidth={2.5} /> Settle</span>
                               </button>
                             </div>
                           ) : (
@@ -531,7 +532,7 @@ export default function Payments() {
         /* Global Queue View */
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">📋 Unpaid Billing Cycles Queue Across All Farmers</h3>
+            <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><ClipboardList size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Unpaid Billing Cycles Queue Across All Farmers</h3>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {selectedCycleIds.length > 0 && (
                 <button
@@ -557,7 +558,7 @@ export default function Payments() {
               {queueData?.overdue?.length > 0 && (
                 <div style={{ marginBottom: '2rem' }}>
                   <h4 style={{ color: 'var(--clr-danger)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    🚨 Overdue Cycles ({queueData.overdue.length})
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--clr-danger)" }}><AlertTriangle size={18} strokeWidth={2.5} /> Overdue Cycles ({queueData.overdue.length})</span>
                   </h4>
                   <div className="table-wrapper">
                     <table className="table">
@@ -603,7 +604,7 @@ export default function Payments() {
                                   title="Edit Rate or Duration"
                                   onClick={() => handleOpenEdit(item)}
                                 >
-                                  ✏️ Edit
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span>
                                 </button>
                                 <button className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleOpenPreview(item.cycleId)}>
                                   Settle
@@ -622,7 +623,7 @@ export default function Payments() {
               {([...(queueData?.due_today || []), ...(queueData?.upcoming || [])]).length > 0 && (
                 <div>
                   <h4 style={{ color: 'var(--clr-primary)', marginBottom: '0.75rem' }}>
-                    📅 Active & Upcoming Due Cycles ({([...(queueData?.due_today || []), ...(queueData?.upcoming || [])]).length})
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Calendar size={18} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Active & Upcoming Due Cycles ({([...(queueData?.due_today || []), ...(queueData?.upcoming || [])]).length})</span>
                   </h4>
                   <div className="table-wrapper">
                     <table className="table">
@@ -670,7 +671,7 @@ export default function Payments() {
                                   title="Edit Rate or Duration"
                                   onClick={() => handleOpenEdit(item)}
                                 >
-                                  ✏️ Edit
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span>
                                 </button>
                                 <button className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleOpenPreview(item.cycleId)}>
                                   Settle
@@ -693,7 +694,7 @@ export default function Payments() {
       {editModalOpen && editingCycle && (
         <div className="modal-overlay" onClick={() => setEditModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-            <h3>✏️ Edit Billing Cycle #{editingCycle.id || editingCycle.cycleId}</h3>
+            <h3><span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span> Billing Cycle #{editingCycle.id || editingCycle.cycleId}</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
               Current Period: <strong>{editingCycle.startDate} → {editingCycle.endDate}</strong> ({editingCycle.durationDays || editingCycle.duration_days} Days)
             </p>
@@ -747,7 +748,7 @@ export default function Payments() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={savingEdit}>
-                  {savingEdit ? <span className="spinner"></span> : '💾 Save Changes'}
+                  {savingEdit ? <span className="spinner"></span> : (<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Save size={16} strokeWidth={2.5} /> Save Changes</span>)}
                 </button>
               </div>
             </form>
@@ -759,7 +760,7 @@ export default function Payments() {
       {settleModalOpen && preview && (
         <div className="modal-overlay" onClick={() => setSettleModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>💳 Settle Billing Cycle #{preview.cycle?.id}</h3>
+            <h3><span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><CreditCard size={13} strokeWidth={2.5} /> Settle</span> Billing Cycle #{preview.cycle?.id}</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.5rem' }}>
               Farmer: <strong>{preview.farmer?.name}</strong> | Rate: ₹{preview.rate}/L
             </p>
@@ -799,7 +800,7 @@ export default function Payments() {
       {batchModalOpen && (
         <div className="modal-overlay" onClick={() => setBatchModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>💳 Batch Settle {selectedCycleIds.length} Selected Cycles</h3>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><CreditCard size={20} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Batch Settle {selectedCycleIds.length} Selected Cycles</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.5rem' }}>
               Settle all selected cycles atomically.
             </p>
