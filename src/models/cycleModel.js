@@ -336,8 +336,97 @@ async function getActiveCycleCount(client = db) {
   return Number(result.rows[0].active_cycles);
 }
 
+async function findOverlappingCycles({ farmerId, startDate, endDate, excludeCycleId = null, forUpdate = false }, client = db) {
+  let query = `
+    SELECT id, farmer_id, start_date, end_date, 
+           COALESCE(duration_days, (end_date - start_date + 1)) AS duration_days, 
+           COALESCE(cycle_type, '15_days') AS cycle_type,
+           rate_per_liter, 
+           COALESCE(payment_due_date, end_date) AS payment_due_date, 
+           status
+    FROM farmer_cycles
+    WHERE farmer_id = $1
+      AND start_date <= $3
+      AND end_date >= $2
+  `;
+  const params = [farmerId, startDate, endDate];
+  if (excludeCycleId) {
+    query += ` AND id != $4`;
+    params.push(excludeCycleId);
+  }
+  query += ` ORDER BY start_date ASC, id ASC`;
+  if (forUpdate) {
+    query += ` FOR UPDATE`;
+  }
+
+  const result = await client.query(query, params);
+  return result.rows;
+}
+
+async function checkConflictingMilkEntries(sourceCycleId, destCycleId, client = db) {
+  const result = await client.query(
+    `SELECT b.id AS source_id, b.date, b.time, b.liters AS source_liters,
+            a.id AS dest_id, a.liters AS dest_liters
+     FROM milk_entries b
+     JOIN milk_entries a 
+       ON a.farmer_id = b.farmer_id 
+      AND a.date = b.date 
+      AND a.time = b.time
+     WHERE b.cycle_id = $1 AND a.cycle_id = $2`,
+    [sourceCycleId, destCycleId]
+  );
+  return result.rows;
+}
+
+async function reassignMilkEntriesByDateRange({ fromCycleId, toCycleId, startDate, endDate }, client = db) {
+  let query = `
+    UPDATE milk_entries
+    SET cycle_id = $1
+    WHERE cycle_id = $2
+  `;
+  const params = [toCycleId, fromCycleId];
+  if (startDate) {
+    params.push(startDate);
+    query += ` AND date >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    query += ` AND date <= $${params.length}`;
+  }
+  query += ` RETURNING id, date, time, liters`;
+  const result = await client.query(query, params);
+  return result.rows;
+}
+
+async function assignUnassignedMilkEntries({ farmerId, cycleId, startDate, endDate }, client = db) {
+  const result = await client.query(
+    `UPDATE milk_entries
+     SET cycle_id = $1
+     WHERE farmer_id = $2 
+       AND (cycle_id IS NULL)
+       AND date >= $3 AND date <= $4
+     RETURNING id, date, time, liters`,
+    [cycleId, farmerId, startDate, endDate]
+  );
+  return result.rows;
+}
+
+async function invalidateDistributionPreviewsForCycles(cycleIds, client = db) {
+  if (!cycleIds || cycleIds.length === 0) return 0;
+  const result = await client.query(
+    `UPDATE distribution_previews
+     SET status = 'rejected'
+     WHERE id IN (
+       SELECT distribution_id FROM distribution_cycles WHERE cycle_id = ANY($1::BIGINT[])
+     ) AND status = 'pending'`,
+    [cycleIds]
+  );
+  return result.rowCount;
+}
+
 module.exports = {
   findOverlappingCycle,
+  findOverlappingCycles,
   findCycleByFarmerAndDate,
   findActiveCycleByFarmerId,
   getCyclesByFarmerId,
@@ -352,4 +441,9 @@ module.exports = {
   getAllUnpaidCycles,
   getUnpaidCyclesWithCalculations,
   getActiveCycleCount,
+  checkConflictingMilkEntries,
+  reassignMilkEntriesByDateRange,
+  assignUnassignedMilkEntries,
+  invalidateDistributionPreviewsForCycles,
 };
+

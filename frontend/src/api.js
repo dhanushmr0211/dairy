@@ -56,6 +56,26 @@ export function getCyclesByFarmer(farmerId) {
   return request(`/cycles/farmer/${farmerId}`);
 }
 
+export function updateCycle(cycleId, body) {
+  return request(`/cycles/${cycleId}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function splitCycle(cycleId, body = {}) {
+  return request(`/cycles/${cycleId}/split`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function extendCycle(cycleId, body = {}) {
+  return request(`/cycles/${cycleId}/extend`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function mergeCycle(cycleId, body = {}) {
+  return request(`/cycles/${cycleId}/merge`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function deleteCycle(cycleId) {
+  return request(`/cycles/${cycleId}`, { method: 'DELETE' });
+}
+
 // ── Milk ──
 export function addMilkEntry(body) {
   return request('/milk', { method: 'POST', body: JSON.stringify(body) });

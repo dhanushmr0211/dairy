@@ -247,15 +247,11 @@ export default function Dashboard() {
   return (
     <div>
       {/* ── Page Header ── */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Dairy Dashboard Overview</h2>
-          <p>Real-time milk collections, company wallet, and automated farmer payment settlements</p>
+          <h2>Dairy Dashboard</h2>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)}>
-            <span>➕</span> Record Received Payment
-          </button>
           <button className="btn btn-outline btn-sm" onClick={loadDashboard}>
             <span>🔄</span> Refresh
           </button>
@@ -333,32 +329,27 @@ export default function Dashboard() {
               boxShadow: 'var(--shadow-md)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--clr-border)', paddingBottom: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1.4rem' }}>🏦</span>
-                  <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-primary-dim)' }}>
-                    Dairy Company Wallet & Hatsun Settlements
-                  </h3>
-                </div>
-                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem' }}>
-                  Single source of truth tracking confirmed company deposits and oldest-first farmer disbursements
-                </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--clr-border)', paddingBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.4rem' }}>🏦</span>
+                <h3 className="card-title" style={{ fontSize: 'var(--fs-lg)', color: 'var(--clr-primary-dim)', margin: 0 }}>
+                  Dairy Company Wallet
+                </h3>
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button 
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-primary btn-sm"
                   onClick={() => setReceiptModalOpen(true)}
                 >
                   ➕ Record Received Payment
                 </button>
                 <button 
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-success btn-sm"
                   onClick={() => handleOpenAutoDistribution('BELOW_BALANCE')}
                   disabled={currentWalletBal <= 0}
                 >
-                  ⚡ Auto-Distribute (Oldest First)
+                  ⚡ Auto-Distribute
                 </button>
                 <Link to="/wallet" className="btn btn-outline btn-sm">
                   Full Ledger →
@@ -377,7 +368,7 @@ export default function Dashboard() {
                   ₹{currentWalletBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
-                  {currentWalletBal > 0 ? 'Funds ready for distribution' : 'Wallet empty (record deposit below)'}
+                  {currentWalletBal > 0 ? 'Ready to pay farmers' : 'Wallet empty'}
                 </div>
               </div>
 
@@ -389,15 +380,12 @@ export default function Dashboard() {
                 <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--clr-text)', marginTop: '0.35rem' }}>
                   Expected: 3rd, 13th & 23rd
                 </div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem' }}>
-                  {walletInfo?.expectedDepositAlert || 'Expected payment dates are informational. Confirm actual receipt before crediting.'}
-                </div>
               </div>
 
               {/* Distribution Proposal / Oldest Cycle */}
               <div style={{ background: '#ffffff', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-md)', padding: '1rem', boxShadow: 'var(--shadow-xs)' }}>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-accent)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  ⚡ Auto-Distribution Capacity
+                  ⚡ Auto-Pay Status
                 </div>
                 {walletInfo?.distributionProposal?.hasProposal ? (
                   <>
@@ -405,16 +393,16 @@ export default function Dashboard() {
                       Can Pay ₹{Number(walletInfo.distributionProposal.proposedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem' }}>
-                      Covers <strong>{walletInfo.distributionProposal.selectedCyclesCount}</strong> oldest cycles for <strong>{walletInfo.distributionProposal.selectedFarmersCount}</strong> farmers
+                      {walletInfo.distributionProposal.selectedCyclesCount} cycle(s) for {walletInfo.distributionProposal.selectedFarmersCount} farmer(s)
                     </div>
                   </>
                 ) : (
                   <>
                     <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--clr-text-muted)', marginTop: '0.35rem' }}>
-                      {Number(walletInfo?.balance || 0) <= 0 ? 'Insufficient wallet balance' : 'All pending cycles fit within balance'}
+                      {Number(walletInfo?.balance || 0) <= 0 ? 'Insufficient wallet balance' : 'Pending cycles fit within balance'}
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
-                      Oldest Unpaid Cycle: <strong>{walletInfo?.oldestUnpaidCycleDate || 'None'}</strong>
+                      Oldest Unpaid: <strong>{walletInfo?.oldestUnpaidCycleDate || 'None'}</strong>
                     </div>
                   </>
                 )}
@@ -627,7 +615,6 @@ export default function Dashboard() {
                       <th>Feed Deduct</th>
                       <th>Net Amount to Pay</th>
                       <th>Due Date / Status</th>
-                      <th>Quick Select</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -641,6 +628,13 @@ export default function Dashboard() {
                           style={{
                             background: isSelected ? '#eff6ff' : undefined,
                             transition: 'background 0.2s',
+                            cursor: 'pointer'
+                          }}
+                          onClick={(e) => {
+                            // If clicking on row directly, toggle checkbox
+                            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                              handleToggleCycle(item.cycleId);
+                            }
                           }}
                         >
                           <td style={{ textAlign: 'center' }}>
@@ -660,9 +654,12 @@ export default function Dashboard() {
                               <button
                                 className="btn btn-outline btn-sm"
                                 style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem', marginTop: '0.25rem' }}
-                                onClick={() => handleSelectFarmerAllCycles(item.farmerId)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectFarmerAllCycles(item.farmerId);
+                                }}
                               >
-                                Toggle All ({farmerCyclesCount} cycles)
+                                Toggle All ({farmerCyclesCount})
                               </button>
                             )}
                           </td>
@@ -719,14 +716,6 @@ export default function Dashboard() {
                                 </span>
                               </div>
                             )}
-                          </td>
-                          <td>
-                            <button
-                              className={`btn ${isSelected ? 'btn-danger' : 'btn-primary'} btn-sm`}
-                              onClick={() => handleToggleCycle(item.cycleId)}
-                            >
-                              {isSelected ? '✓ Selected' : '+ Select Cycle'}
-                            </button>
                           </td>
                         </tr>
                       );

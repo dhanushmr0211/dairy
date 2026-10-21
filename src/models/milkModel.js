@@ -118,6 +118,17 @@ async function getTodayMilkTotal(client = db) {
   return Number(result.rows[0].total_milk_today);
 }
 
+async function getMilkEntryCountByCycleId(cycleId, client = db) {
+  const result = await client.query(
+    `SELECT COUNT(*)::INT AS entry_count
+     FROM milk_entries
+     WHERE cycle_id = $1`,
+    [cycleId]
+  );
+
+  return Number(result.rows[0].entry_count);
+}
+
 module.exports = {
   createMilkEntry,
   findMilkEntryById,
@@ -126,7 +137,9 @@ module.exports = {
   deleteMilkEntry,
   getMilkEntriesByFarmerId,
   getTotalLitersByCycleId,
+  getMilkEntryCountByCycleId,
   getTodayMorningMilk,
   getTodayEveningMilk,
   getTodayMilkTotal,
 };
+

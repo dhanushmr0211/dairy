@@ -157,14 +157,13 @@ export default function Wallet() {
   return (
     <div>
       {/* ── Page Header ── */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Dairy Company Wallet & Payout Ledger</h2>
-          <p>Single source of truth tracking confirmed Hatsun deposits and oldest-first farmer disbursements</p>
+          <h2>Dairy Company Wallet</h2>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)}>
-            <span>➕</span> Record Received Payment / Deposit
+            <span>➕</span> Record Received Payment
           </button>
           <button 
             className="btn btn-success btn-sm" 
@@ -244,31 +243,19 @@ export default function Wallet() {
               border: '1px solid #bae6fd', 
               borderLeft: '5px solid var(--clr-primary)', 
               borderRadius: 'var(--radius-md)', 
-              padding: '1rem 1.25rem', 
+              padding: '0.85rem 1.25rem', 
               marginBottom: 'var(--sp-6)', 
               boxShadow: 'var(--shadow-xs)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: '1rem'
+              gap: '0.5rem'
             }}
           >
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--clr-primary-dim)', fontSize: 'var(--fs-sm)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>📅</span> Hatsun Payment Cycle Schedule: 3rd, 13th and 23rd of each month
-              </div>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.2rem' }}>
-                {summary?.expectedDeposits?.alert || 'Expected deposit dates are strictly informational and never auto-credit the account. Money is only added when you record actual received payments.'}
-              </div>
+            <div style={{ fontWeight: 700, color: 'var(--clr-primary-dim)', fontSize: 'var(--fs-sm)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>📅</span> Hatsun Deposit Schedule: 3rd, 13th & 23rd of each month
             </div>
-
-            <button 
-              className="btn btn-primary btn-sm"
-              onClick={() => setReceiptModalOpen(true)}
-            >
-              Record Deposit Now
-            </button>
           </div>
 
           {/* ═══ Tabs: Ledger vs Distribution Audit ═══ */}

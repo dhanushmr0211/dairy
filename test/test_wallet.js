@@ -41,11 +41,12 @@ function assertGte(actual, expected, label) {
 
 // ── Database Helpers ──
 async function cleanTestData(client) {
+  await client.query("SET app.bypass_paid_locks = 'on'");
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
-  await client.query('UPDATE farmer_cycles SET status = \'active\' WHERE status = \'paid\'');
+  await client.query("UPDATE farmer_cycles SET status = 'active' WHERE status = 'paid'");
 }
 
 async function createTestFarmer(client, name, phone) {
@@ -130,9 +131,9 @@ async function testEmptyWallet(client) {
   console.log('\n📋 Test: Empty Wallet - No distributions possible');
 
   // Clean wallet
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   const balance = await getWalletBalance(client);
   assertEq(balance, 0, 'Wallet starts at 0');
@@ -142,9 +143,9 @@ async function testNegativeBalancePrevention(client) {
   console.log('\n📋 Test: Negative Balance Prevention');
 
   // Start fresh
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   // Add a small receipt
   await createLedgerEntry(client, 'receipt', 100, '2026-10-01');
@@ -166,9 +167,9 @@ async function testOldestFirstSelection(client) {
   console.log('\n📋 Test: Oldest-First Cycle Selection');
 
   // Reset
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -207,9 +208,9 @@ async function testOldestFirstSelection(client) {
 async function testMultipleUnpaidCyclesSameFarmer(client) {
   console.log('\n📋 Test: Multiple Unpaid Cycles for Same Farmer');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -241,9 +242,9 @@ async function testMultipleUnpaidCyclesSameFarmer(client) {
 async function testExactBalanceMatch(client) {
   console.log('\n📋 Test: Exact Balance Match');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -269,9 +270,9 @@ async function testExactBalanceMatch(client) {
 async function testCycleTotalBelowBalance(client) {
   console.log('\n📋 Test: Cycle Total Below Balance');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -294,9 +295,9 @@ async function testCycleTotalBelowBalance(client) {
 async function testCycleTotalJustAboveBalance(client) {
   console.log('\n📋 Test: Cycle Total Just Above Balance');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -323,9 +324,9 @@ async function testCycleTotalJustAboveBalance(client) {
 async function testMarginBoundary(client) {
   console.log('\n📋 Test: ₹500 Margin Boundary');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -367,9 +368,9 @@ async function testMarginBoundary(client) {
 async function testInsufficientWalletBalance(client) {
   console.log('\n📋 Test: Insufficient Wallet Balance');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -392,9 +393,9 @@ async function testInsufficientWalletBalance(client) {
 async function testWalletBalanceChangeAfterPreview(client) {
   console.log('\n📋 Test: Wallet Balance Change After Preview');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   // Simulate: preview was at balance 10000
   await createLedgerEntry(client, 'receipt', 10000, '2026-10-03');
@@ -416,9 +417,9 @@ async function testWalletBalanceChangeAfterPreview(client) {
 async function testCyclePaidByAnotherRequestAfterPreview(client) {
   console.log('\n📋 Test: Cycle Paid By Another Request After Preview');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -441,6 +442,7 @@ async function testCyclePaidByAnotherRequestAfterPreview(client) {
 async function testDuplicateConfirmation(client) {
   console.log('\n📋 Test: Duplicate Confirmation Prevention');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
 
@@ -460,9 +462,9 @@ async function testDuplicateConfirmation(client) {
 async function testTransactionRollback(client) {
   console.log('\n📋 Test: Transaction Rollback');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   await createLedgerEntry(client, 'receipt', 5000, '2026-10-03');
   const balanceBefore = await getWalletBalance(client);
@@ -489,9 +491,9 @@ async function testTransactionRollback(client) {
 async function testDashboardTotals(client) {
   console.log('\n📋 Test: Dashboard Totals Accuracy');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM payments');
   await client.query('DELETE FROM milk_entries');
   await client.query('DELETE FROM feed_records');
@@ -532,9 +534,9 @@ async function testDashboardTotals(client) {
 async function testNoNegativeWalletBalance(client) {
   console.log('\n📋 Test: No Negative Wallet Balance Under Any Mode');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   await createLedgerEntry(client, 'receipt', 300, '2026-10-03');
 
@@ -556,9 +558,9 @@ async function testNoNegativeWalletBalance(client) {
 async function testLedgerIntegrity(client) {
   console.log('\n📋 Test: Ledger Integrity - Running Balance Consistency');
 
+  await client.query('DELETE FROM wallet_ledger');
   await client.query('DELETE FROM distribution_cycles');
   await client.query('DELETE FROM distribution_previews');
-  await client.query('DELETE FROM wallet_ledger');
 
   // Create several transactions
   await createLedgerEntry(client, 'receipt', 10000, '2026-10-03', 'REF-001');
@@ -610,6 +612,7 @@ async function runTests() {
   try {
     await client.query("SET SESSION app.bypass_paid_locks = 'on'");
     await client.query('BEGIN');
+    await cleanTestData(client);
 
     await testRecordReceipt(client);
     await testDuplicateReceiptReference(client);

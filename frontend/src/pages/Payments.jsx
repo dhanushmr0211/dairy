@@ -3,6 +3,7 @@ import {
   getFarmers,
   getCyclesByFarmer,
   startCycle,
+  updateCycle,
   getPaymentPreview,
   payCycle,
   paySelectedCycles,
@@ -38,11 +39,21 @@ export default function Payments() {
   const [paying, setPaying] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
 
+  // Edit Cycle state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCycle, setEditingCycle] = useState(null);
+  const [editForm, setEditForm] = useState({
+    ratePerLiter: '',
+    durationDays: 15,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Multi-cycle selection
   const [selectedCycleIds, setSelectedCycleIds] = useState([]);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const { showToast } = useToast();
+
 
   useEffect(() => {
     getFarmers()
@@ -128,6 +139,39 @@ export default function Payments() {
     }
   };
 
+  const handleOpenEdit = (cycle) => {
+    setEditingCycle(cycle);
+    setEditForm({
+      ratePerLiter: String(cycle.ratePerLiter || cycle.rate_per_liter || ''),
+      durationDays: Number(cycle.durationDays || cycle.duration_days || 15),
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingCycle) return;
+    setSavingEdit(true);
+    try {
+      const cycleId = editingCycle.id || editingCycle.cycleId;
+      const res = await updateCycle(cycleId, {
+        ratePerLiter: Number(editForm.ratePerLiter),
+        durationDays: Number(editForm.durationDays),
+      });
+      showToast(res.message || 'Cycle updated successfully!', 'success');
+      setEditModalOpen(false);
+      if (viewTab === 'farmer' && selectedFarmerId) {
+        loadFarmerData(selectedFarmerId);
+      } else {
+        loadQueue();
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to update cycle', 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleOpenPreview = async (cycleId) => {
     try {
       setPreviewLoading(true);
@@ -201,8 +245,7 @@ export default function Payments() {
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Billing Cycles & Settlements</h2>
-          <p>Create consecutive 15/30-day billing periods and settle single or multiple cycles</p>
+          <h2>Billing Cycles & Payments</h2>
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -349,13 +392,23 @@ export default function Payments() {
                         <strong style={{ color: 'var(--clr-success)', display: 'block' }}>
                           ₹{Number(c.finalAmount || 0).toFixed(2)}
                         </strong>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          style={{ marginTop: '0.25rem', padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
-                          onClick={() => handleOpenPreview(c.id)}
-                        >
-                          Settle Now
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.25rem', justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                            title="Edit Rate or Duration"
+                            onClick={() => handleOpenEdit(c)}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                            onClick={() => handleOpenPreview(c.id)}
+                          >
+                            Settle Now
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -445,12 +498,23 @@ export default function Payments() {
                         </td>
                         <td>
                           {!c.isPaid ? (
-                            <button
-                              className="btn btn-success btn-sm"
-                              onClick={() => handleOpenPreview(c.id)}
-                            >
-                              💳 Settle
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <button
+                                className="btn btn-outline btn-sm"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                title="Edit Rate or Duration"
+                                onClick={() => handleOpenEdit(c)}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                className="btn btn-success btn-sm"
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                                onClick={() => handleOpenPreview(c.id)}
+                              >
+                                💳 Settle
+                              </button>
+                            </div>
                           ) : (
                             <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>Settled</span>
                           )}
@@ -532,9 +596,19 @@ export default function Payments() {
                             </td>
                             <td><strong style={{ color: 'var(--clr-danger)' }}>₹{Number(item.finalAmount).toFixed(2)}</strong></td>
                             <td>
-                              <button className="btn btn-primary btn-sm" onClick={() => handleOpenPreview(item.cycleId)}>
-                                Settle
-                              </button>
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button
+                                  className="btn btn-outline btn-sm"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  title="Edit Rate or Duration"
+                                  onClick={() => handleOpenEdit(item)}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleOpenPreview(item.cycleId)}>
+                                  Settle
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -589,9 +663,19 @@ export default function Payments() {
                             </td>
                             <td><strong style={{ color: 'var(--clr-success)' }}>₹{Number(item.finalAmount).toFixed(2)}</strong></td>
                             <td>
-                              <button className="btn btn-primary btn-sm" onClick={() => handleOpenPreview(item.cycleId)}>
-                                Settle
-                              </button>
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button
+                                  className="btn btn-outline btn-sm"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  title="Edit Rate or Duration"
+                                  onClick={() => handleOpenEdit(item)}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button className="btn btn-primary btn-sm" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} onClick={() => handleOpenPreview(item.cycleId)}>
+                                  Settle
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -602,6 +686,72 @@ export default function Payments() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Edit Cycle Modal */}
+      {editModalOpen && editingCycle && (
+        <div className="modal-overlay" onClick={() => setEditModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <h3>✏️ Edit Billing Cycle #{editingCycle.id || editingCycle.cycleId}</h3>
+            <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
+              Current Period: <strong>{editingCycle.startDate} → {editingCycle.endDate}</strong> ({editingCycle.durationDays || editingCycle.duration_days} Days)
+            </p>
+
+            <form onSubmit={handleSaveEdit}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Rate per Liter (₹/L)</label>
+                  <input
+                    type="number"
+                    step="0.10"
+                    min="1"
+                    className="form-input"
+                    value={editForm.ratePerLiter}
+                    onChange={(e) => setEditForm({ ...editForm, ratePerLiter: e.target.value })}
+                    required
+                  />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)', marginTop: '0.25rem', display: 'block' }}>
+                    Updating rate refreshes gross amount, feed deductions, and invalidates stale previews.
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Duration</label>
+                  <select
+                    className="form-select"
+                    value={editForm.durationDays}
+                    onChange={(e) => setEditForm({ ...editForm, durationDays: Number(e.target.value) })}
+                  >
+                    <option value={15}>15 Days Period</option>
+                    <option value={30}>30 Days Period</option>
+                  </select>
+                </div>
+
+                {/* Context notices for Split vs Merge */}
+                {Number(editingCycle.durationDays || editingCycle.duration_days) > 15 && Number(editForm.durationDays) === 15 && (
+                  <div style={{ padding: '0.75rem', background: 'var(--clr-surface-alt)', borderRadius: 'var(--radius-md)', border: '1px solid var(--clr-primary)', fontSize: 'var(--fs-xs)', lineHeight: 1.4 }}>
+                    ℹ️ <strong>Shorten & Split:</strong> This cycle will be shortened to 15 days. A second consecutive cycle will be automatically created for the remaining dates, and milk entries will be safely reassigned without loss.
+                  </div>
+                )}
+
+                {Number(editingCycle.durationDays || editingCycle.duration_days) <= 15 && Number(editForm.durationDays) === 30 && (
+                  <div style={{ padding: '0.75rem', background: 'var(--clr-surface-alt)', borderRadius: 'var(--radius-md)', border: '1px solid var(--clr-success)', fontSize: 'var(--fs-xs)', lineHeight: 1.4 }}>
+                    ℹ️ <strong>Extend & Merge:</strong> This cycle will be expanded to 30 days. If an unpaid consecutive cycle already exists for the next 15 days, its milk entries will be merged safely into this cycle.
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setEditModalOpen(false)} disabled={savingEdit}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={savingEdit}>
+                  {savingEdit ? <span className="spinner"></span> : '💾 Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
