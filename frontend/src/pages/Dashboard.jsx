@@ -147,7 +147,9 @@ export default function Dashboard() {
     }
   };
 
-
+  const isAllVisibleSelected =
+    filteredCycles.length > 0 &&
+    filteredCycles.every((c) => selectedCycleIds.includes(c.cycleId));
 
   return (
     <div>
