@@ -26,9 +26,13 @@ router.all('/distribution/preview', walletController.distributePreview);
 router.post('/distribute/confirm', walletController.distributeConfirm);
 router.post('/distribution/confirm', walletController.distributeConfirm);
 
-// ── Distribution History (both /distributions and /distribution/history supported) ──
+// ── Distribution History & Deletions ──
 router.get('/distributions', walletController.getDistributions);
 router.get('/distribution/history', walletController.getDistributions);
 router.get('/distributions/:id', walletController.getDistributionDetail);
+router.delete('/distributions/:id', walletController.deleteDistribution);
+router.delete('/distribution/:id', walletController.deleteDistribution);
+router.delete('/distributions', walletController.clearDistributions);
+router.delete('/distribution', walletController.clearDistributions);
 
 module.exports = router;

@@ -606,7 +606,54 @@ const getPaymentsByFarmer = asyncHandler(async (req, res) => {
   res.json(payments);
 });
 
-// ── PUT /payments/:id (Blocked - completed payments permanently locked) ──
+// ── GET /payments/settlements (All settled payments across all farmers) ──
+const getAllSettledPayments = asyncHandler(async (req, res) => {
+  const result = await db.query(
+    `SELECT p.id,
+            p.cycle_id,
+            c.farmer_id,
+            f.name AS farmer_name,
+            f.phone AS farmer_phone,
+            c.start_date,
+            c.end_date,
+            c.duration_days,
+            c.rate_per_liter,
+            p.total_liters,
+            p.total_amount AS gross_amount,
+            p.feed_deduction,
+            p.final_amount,
+            p.paid_date,
+            p.created_at
+     FROM payments p
+     INNER JOIN farmer_cycles c ON c.id = p.cycle_id
+     INNER JOIN farmers f ON f.id = c.farmer_id
+     ORDER BY p.paid_date DESC, p.id DESC`
+  );
+
+  res.json({
+    success: true,
+    count: result.rows.length,
+    payments: result.rows.map((r) => ({
+      id: Number(r.id),
+      cycleId: Number(r.cycle_id),
+      farmerId: Number(r.farmer_id),
+      farmerName: r.farmer_name,
+      farmerPhone: r.farmer_phone,
+      startDate: toIsoDateString(r.start_date),
+      endDate: toIsoDateString(r.end_date),
+      durationDays: r.duration_days,
+      ratePerLiter: Number(r.rate_per_liter),
+      totalLiters: Number(r.total_liters),
+      grossAmount: Number(r.gross_amount),
+      feedDeduction: Number(r.feed_deduction),
+      finalAmount: Number(r.final_amount),
+      paidDate: toIsoDateString(r.paid_date),
+      createdAt: r.created_at,
+    })),
+  });
+});
+
+// ── PUT /payments/:id (Blocked - completed payments editing not supported) ──
 const updatePayment = asyncHandler(async (req, res) => {
   return res.status(409).json({
     success: false,
@@ -614,12 +661,52 @@ const updatePayment = asyncHandler(async (req, res) => {
   });
 });
 
-// ── DELETE /payments/:id (Blocked - completed payments permanently locked) ──
+// ── DELETE /payments/:id (Delete/revert a completed payment settlement) ──
 const deletePayment = asyncHandler(async (req, res) => {
-  return res.status(409).json({
-    success: false,
-    message: 'Completed payment records cannot be deleted.',
-  });
+  const { id } = req.params;
+  const parsedId = parsePositiveInteger(id);
+  if (!parsedId) {
+    return res.status(400).json({ success: false, message: 'Invalid payment ID.' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const paymentRes = await client.query('SELECT * FROM payments WHERE id = $1 FOR UPDATE', [parsedId]);
+    if (paymentRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Payment record not found.' });
+    }
+
+    const payment = paymentRes.rows[0];
+    const cycleId = payment.cycle_id;
+
+    // 1. Unlink or remove any wallet_ledger entries tied to this payment
+    await client.query('DELETE FROM wallet_ledger WHERE related_payment_id = $1', [parsedId]);
+
+    // 2. Unlink any distribution_cycles tied to this payment
+    await client.query('UPDATE distribution_cycles SET payment_id = NULL WHERE payment_id = $1', [parsedId]);
+
+    // 3. Delete the payment
+    await client.query('DELETE FROM payments WHERE id = $1', [parsedId]);
+
+    // 4. Reset the cycle status back to 'active'
+    await client.query("UPDATE farmer_cycles SET status = 'active' WHERE id = $1", [cycleId]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Payment record #${parsedId} deleted and Cycle #${cycleId} restored to active status.`,
+      cycleId: Number(cycleId),
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 module.exports = {
@@ -631,6 +718,7 @@ module.exports = {
   getPaymentSummary,
   paySelectedCycles,
   payCycle,
+  getAllSettledPayments,
   getPaymentsByFarmer,
   updatePayment,
   deletePayment,

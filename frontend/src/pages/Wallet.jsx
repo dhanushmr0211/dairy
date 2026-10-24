@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Landmark, 
   ArrowDownLeft, 
@@ -15,7 +15,10 @@ import {
   Sliders,
   Trash2,
   Pencil,
-  X
+  X,
+  CheckCircle2,
+  Search,
+  Phone
 } from 'lucide-react';
 import { 
   getWalletSummary, 
@@ -25,7 +28,11 @@ import {
   recordWalletReceipt, 
   getDistributionPreview, 
   confirmDistribution,
-  getDistributionHistory
+  getDistributionHistory,
+  deleteDistributionRecord,
+  clearDistributionRecords,
+  getSettledPayments,
+  deleteSettledPayment
 } from '../api';
 import { useToast } from '../context/ToastContext';
 
@@ -33,12 +40,14 @@ export default function Wallet() {
   const [summary, setSummary] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [distHistory, setDistHistory] = useState([]);
+  const [settledPayments, setSettledPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter
+  // Filter & Search
   const [txTypeFilter, setTxTypeFilter] = useState('');
-  const [activeTab, setActiveTab] = useState('ledger'); // 'ledger' or 'history'
+  const [settlementSearchQuery, setSettlementSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('ledger'); // 'ledger', 'settlements', or 'history'
 
   // Modals
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
@@ -49,6 +58,13 @@ export default function Wallet() {
   const [submittingBalanceEdit, setSubmittingBalanceEdit] = useState(false);
   const [txToDelete, setTxToDelete] = useState(null);
   const [deletingTx, setDeletingTx] = useState(false);
+
+  // Deletion modals for distributions and settlements
+  const [distToDelete, setDistToDelete] = useState(null);
+  const [deletingDist, setDeletingDist] = useState(false);
+  const [clearingDist, setClearingDist] = useState(false);
+  const [settlementToDelete, setSettlementToDelete] = useState(null);
+  const [deletingSettlement, setDeletingSettlement] = useState(false);
 
   // Transaction Form State
   const [txType, setTxType] = useState('receipt'); // 'receipt', 'adjustment', 'farmer_payment'
@@ -71,15 +87,17 @@ export default function Wallet() {
     try {
       setLoading(true);
       setError(null);
-      const [summaryRes, txRes, historyRes] = await Promise.all([
+      const [summaryRes, txRes, historyRes, settlementsRes] = await Promise.all([
         getWalletSummary(),
         getWalletTransactions(txTypeFilter ? { type: txTypeFilter } : {}),
-        getDistributionHistory()
+        getDistributionHistory(),
+        getSettledPayments()
       ]);
 
       setSummary(summaryRes);
       setTransactions(txRes.transactions || []);
       setDistHistory(historyRes.distributions || []);
+      setSettledPayments(settlementsRes.payments || []);
     } catch (err) {
       setError(err.message || 'Failed to load wallet data');
     } finally {
@@ -90,6 +108,66 @@ export default function Wallet() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Filtered settlements list
+  const filteredSettlements = useMemo(() => {
+    if (!settlementSearchQuery.trim()) return settledPayments;
+    const q = settlementSearchQuery.toLowerCase().trim();
+    return settledPayments.filter((p) => {
+      const matchFarmer = p.farmerName?.toLowerCase().includes(q);
+      const matchPhone = p.farmerPhone?.includes(q);
+      const matchId = String(p.id).includes(q) || String(p.cycleId).includes(q);
+      return matchFarmer || matchPhone || matchId;
+    });
+  }, [settledPayments, settlementSearchQuery]);
+
+  const failedDistCount = useMemo(() => {
+    return distHistory.filter((h) => ['rejected', 'expired'].includes(h.status)).length;
+  }, [distHistory]);
+
+  const handleConfirmDeleteDist = async () => {
+    if (!distToDelete) return;
+    try {
+      setDeletingDist(true);
+      await deleteDistributionRecord(distToDelete.id);
+      showToast(`Distribution run #${distToDelete.id} deleted successfully.`);
+      setDistToDelete(null);
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to delete distribution record', 'error');
+    } finally {
+      setDeletingDist(false);
+    }
+  };
+
+  const handleClearFailedDistributions = async () => {
+    if (!window.confirm('Are you sure you want to delete all rejected and expired distribution run records?')) return;
+    try {
+      setClearingDist(true);
+      const res = await clearDistributionRecords('failed');
+      showToast(res.message || 'Failed distribution records cleared.');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to clear distribution records', 'error');
+    } finally {
+      setClearingDist(false);
+    }
+  };
+
+  const handleConfirmDeleteSettlement = async () => {
+    if (!settlementToDelete) return;
+    try {
+      setDeletingSettlement(true);
+      await deleteSettledPayment(settlementToDelete.id);
+      showToast(`Payment #${settlementToDelete.id} deleted and Cycle #${settlementToDelete.cycleId} restored to active status.`);
+      setSettlementToDelete(null);
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to revert settlement', 'error');
+    } finally {
+      setDeletingSettlement(false);
+    }
+  };
 
   const handleRecordTransaction = async (e) => {
     e.preventDefault();
@@ -363,13 +441,19 @@ export default function Wallet() {
             </div>
           </div>
 
-          {/* ═══ Tabs: Ledger vs Distribution Audit ═══ */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--sp-4)' }}>
+          {/* ═══ Tabs: Ledger vs Settled Payments vs Distribution Audit ═══ */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--sp-4)', flexWrap: 'wrap' }}>
             <button
               className={`btn btn-sm ${activeTab === 'ledger' ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveTab('ledger')}
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><FileText size={18} strokeWidth={2.5} /> Wallet Transaction Ledger ({transactions.length})</span>
+            </button>
+            <button
+              className={`btn btn-sm ${activeTab === 'settlements' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveTab('settlements')}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><CheckCircle2 size={18} strokeWidth={2.5} /> Settled Farmer Payments ({settledPayments.length})</span>
             </button>
             <button
               className={`btn btn-sm ${activeTab === 'history' ? 'btn-primary' : 'btn-outline'}`}
@@ -506,16 +590,164 @@ export default function Wallet() {
             </div>
           )}
 
-          {/* ═══ Tab 2: Distribution History ═══ */}
+          {/* ═══ Tab 2: Settled Farmer Payments ═══ */}
+          {activeTab === 'settlements' && (
+            <div className="card">
+              <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h3 className="card-title">Settled Farmer Payments</h3>
+                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
+                    Live record of all farmer payments settled via the Settle button or automated distributions
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search farmer / phone / cycle..."
+                    className="form-input"
+                    style={{ width: 220, padding: '0.35rem 0.65rem', fontSize: 'var(--fs-xs)' }}
+                    value={settlementSearchQuery}
+                    onChange={(e) => setSettlementSearchQuery(e.target.value)}
+                  />
+
+                  {settledPayments.length > 0 && (
+                    <span className="badge badge-active" style={{ fontSize: 'var(--fs-xs)' }}>
+                      Total Settled: ₹{settledPayments.reduce((sum, p) => sum + Number(p.finalAmount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {filteredSettlements.length === 0 ? (
+                <div className="empty-state">
+                  <div className="icon" style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}><CheckCircle2 size={48} strokeWidth={2.5} style={{ opacity: 0.3 }} /></div>
+                  <p>{settlementSearchQuery ? 'No payment records match your search query.' : 'No farmer payments have been settled yet.'}</p>
+                  {settlementSearchQuery && (
+                    <button className="btn btn-outline btn-sm" onClick={() => setSettlementSearchQuery('')} style={{ marginTop: '0.5rem' }}>
+                      Clear Search
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="table-wrapper">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Date & Time</th>
+                        <th>Farmer</th>
+                        <th>Billing Cycle</th>
+                        <th style={{ textAlign: 'right' }}>Milk Rate</th>
+                        <th style={{ textAlign: 'right' }}>Total Milk</th>
+                        <th style={{ textAlign: 'right' }}>Gross Amount (₹)</th>
+                        <th style={{ textAlign: 'right' }}>Feed Deduct (₹)</th>
+                        <th style={{ textAlign: 'right' }}>Net Paid (₹)</th>
+                        <th style={{ textAlign: 'center' }}>Status</th>
+                        <th style={{ textAlign: 'center', width: '95px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSettlements.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <strong>{new Date(p.paidDate || p.createdAt || Date.now()).toLocaleDateString()}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
+                              {new Date(p.createdAt || Date.now()).toLocaleTimeString()}
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{p.farmerName}</strong>
+                            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Phone size={13} strokeWidth={2.5} /> {p.farmerPhone}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600 }}>
+                              {new Date(p.startDate).toLocaleDateString()} → {new Date(p.endDate).toLocaleDateString()}
+                            </div>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
+                              {p.durationDays || 15} Days (Cycle #{p.cycleId})
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <strong>₹{Number(p.ratePerLiter).toFixed(2)}</strong>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>/L</span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <strong style={{ color: 'var(--clr-primary)' }}>
+                              {Number(p.totalLiters || 0).toFixed(2)} L
+                            </strong>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            ₹{Number(p.grossAmount || 0).toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'right', color: p.feedDeduction > 0 ? 'var(--clr-danger)' : 'var(--clr-text-dim)' }}>
+                            {p.feedDeduction > 0 ? `-₹${Number(p.feedDeduction).toFixed(2)}` : '₹0.00'}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <strong style={{ color: Number(p.finalAmount) >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)', fontSize: '0.95rem' }}>
+                              ₹{Number(p.finalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge badge-active" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <CheckCircle2 size={13} strokeWidth={2.5} /> Settled
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => setSettlementToDelete(p)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #fecaca',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                transition: 'all 0.15s ease'
+                              }}
+                              title="Revert and delete this settlement record"
+                            >
+                              <Trash2 size={12} strokeWidth={2.5} /> Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Tab 3: Distribution History ═══ */}
           {activeTab === 'history' && (
             <div className="card">
-              <div className="card-header">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <h3 className="card-title">Automated Distribution Run History</h3>
                   <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', marginTop: '0.25rem' }}>
                     Audit log of all proposed and confirmed automatic distribution executions
                   </p>
                 </div>
+
+                {failedDistCount > 0 && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={handleClearFailedDistributions}
+                    disabled={clearingDist}
+                    style={{ borderColor: '#fca5a5', color: '#dc2626', fontWeight: 600 }}
+                  >
+                    {clearingDist ? <span className="spinner"></span> : <><Trash2 size={13} strokeWidth={2.5} /> Clear Failed Runs ({failedDistCount})</>}
+                  </button>
+                )}
               </div>
 
               {distHistory.length === 0 ? (
@@ -535,6 +767,7 @@ export default function Wallet() {
                         <th>Farmers Benefited</th>
                         <th style={{ textAlign: 'right' }}>Total Disbursed (₹)</th>
                         <th style={{ textAlign: 'right' }}>Remaining Balance (₹)</th>
+                        <th style={{ textAlign: 'center', width: '95px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -547,7 +780,7 @@ export default function Wallet() {
                             </div>
                           </td>
                           <td>
-                            <span className={`badge ${h.status === 'confirmed' ? 'badge-active' : 'badge-morning'}`}>
+                            <span className={`badge ${h.status === 'confirmed' ? 'badge-active' : h.status === 'rejected' ? 'badge-danger' : 'badge-morning'}`} style={h.status === 'rejected' ? { background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' } : {}}>
                               {(h.status || 'pending').toUpperCase()}
                             </span>
                           </td>
@@ -563,6 +796,30 @@ export default function Wallet() {
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 600 }}>
                             ₹{Number(h.remaining_balance ?? h.remainingBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => setDistToDelete(h)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #fecaca',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                transition: 'all 0.15s ease'
+                              }}
+                              title="Delete distribution run record"
+                            >
+                              <Trash2 size={12} strokeWidth={2.5} /> Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1012,6 +1269,204 @@ export default function Wallet() {
                   }}
                 >
                   {deletingTx ? <span className="spinner"></span> : <><Trash2 size={16} strokeWidth={2.5} /> Delete Record</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Delete Distribution Run Modal ═══ */}
+      {distToDelete && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setDistToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div 
+            className="modal" 
+            style={{ maxWidth: 460, width: '100%', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: '#991b1b' }}>
+                <AlertTriangle size={20} strokeWidth={2.5} style={{ color: '#dc2626' }} /> Delete Distribution Run
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setDistToDelete(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: 'var(--fs-base)' }}>
+                Are you sure you want to delete this distribution audit record?
+              </p>
+
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Run ID:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)' }}>#{distToDelete.id}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Status:</span>
+                  <span className={`badge ${distToDelete.status === 'confirmed' ? 'badge-active' : distToDelete.status === 'rejected' ? 'badge-danger' : 'badge-morning'}`} style={distToDelete.status === 'rejected' ? { background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' } : {}}>
+                    {(distToDelete.status || 'pending').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Total Disbursed:</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--clr-success)' }}>
+                    ₹{Number(distToDelete.proposed_total ?? distToDelete.proposedTotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Date & Time:</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
+                    {new Date(distToDelete.created_at || distToDelete.createdAt || Date.now()).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setDistToDelete(null)}
+                  disabled={deletingDist}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteDist}
+                  disabled={deletingDist}
+                  style={{
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 800,
+                    padding: '0.65rem 1.25rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {deletingDist ? <span className="spinner"></span> : <><Trash2 size={16} strokeWidth={2.5} /> Delete Record</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Delete / Revert Settlement Modal ═══ */}
+      {settlementToDelete && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setSettlementToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div 
+            className="modal" 
+            style={{ maxWidth: 480, width: '100%', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: '#991b1b' }}>
+                <AlertTriangle size={20} strokeWidth={2.5} style={{ color: '#dc2626' }} /> Revert Settlement Record
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setSettlementToDelete(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: 'var(--fs-base)' }}>
+                Are you sure you want to revert this settlement? This will delete the payment and restore <strong>Cycle #{settlementToDelete.cycleId}</strong> for <strong>{settlementToDelete.farmerName}</strong> to active/unpaid status.
+              </p>
+
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Farmer:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)' }}>{settlementToDelete.farmerName}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Billing Cycle:</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
+                    Cycle #{settlementToDelete.cycleId} ({settlementToDelete.startDate} → {settlementToDelete.endDate})
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Net Paid Amount:</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: 'var(--clr-success)' }}>
+                    ₹{Number(settlementToDelete.finalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Paid Date:</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
+                    {settlementToDelete.paidDate}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setSettlementToDelete(null)}
+                  disabled={deletingSettlement}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteSettlement}
+                  disabled={deletingSettlement}
+                  style={{
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 800,
+                    padding: '0.65rem 1.25rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {deletingSettlement ? <span className="spinner"></span> : <><Trash2 size={16} strokeWidth={2.5} /> Revert & Restore</>}
                 </button>
               </div>
             </div>

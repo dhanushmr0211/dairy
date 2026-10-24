@@ -841,11 +841,100 @@ const deleteTransaction = asyncHandler(async (req, res) => {
   }
 });
 
+// ────────────────────────────────────────────────
+// DELETE /wallet/distributions/:id  – Delete a distribution record
+// ────────────────────────────────────────────────
+const deleteDistribution = asyncHandler(async (req, res) => {
+  const parsedId = parsePositiveInteger(req.params.id);
+  if (!parsedId) {
+    return res.status(400).json({ success: false, message: 'Invalid distribution ID.' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const check = await client.query('SELECT id, status FROM distribution_previews WHERE id = $1', [parsedId]);
+    if (check.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Distribution record not found.' });
+    }
+
+    // Unlink wallet_ledger
+    await client.query('UPDATE wallet_ledger SET related_distribution_id = NULL WHERE related_distribution_id = $1', [parsedId]);
+
+    // Delete distribution_cycles
+    await client.query('DELETE FROM distribution_cycles WHERE distribution_id = $1', [parsedId]);
+
+    // Delete distribution_previews
+    await client.query('DELETE FROM distribution_previews WHERE id = $1', [parsedId]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Distribution record #${parsedId} deleted successfully.`,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+// ────────────────────────────────────────────────
+// DELETE /wallet/distributions  – Clear distribution records (all or failed/expired)
+// ────────────────────────────────────────────────
+const clearDistributions = asyncHandler(async (req, res) => {
+  const { filter } = req.query; // 'all' or 'failed'
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    let whereClause = '';
+    if (filter === 'failed') {
+      whereClause = "WHERE status IN ('rejected', 'expired')";
+    }
+
+    await client.query(`
+      UPDATE wallet_ledger 
+      SET related_distribution_id = NULL 
+      WHERE related_distribution_id IN (SELECT id FROM distribution_previews ${whereClause})
+    `);
+
+    await client.query(`
+      DELETE FROM distribution_cycles 
+      WHERE distribution_id IN (SELECT id FROM distribution_previews ${whereClause})
+    `);
+
+    const delRes = await client.query(`
+      DELETE FROM distribution_previews ${whereClause}
+      RETURNING id
+    `);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      deletedCount: delRes.rows.length,
+      message: `Successfully cleared ${delRes.rows.length} distribution records.`,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = {
   recordReceipt,
   getWalletBalance,
   updateWalletBalance,
   deleteTransaction,
+  deleteDistribution,
+  clearDistributions,
   getTransactions,
   getWalletSummary,
   distributePreview,

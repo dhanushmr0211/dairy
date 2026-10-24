@@ -19,6 +19,10 @@ router.post('/pay-selected', paymentController.paySelectedCycles);
 // ── Single cycle pay ──
 router.post('/pay', paymentController.payCycle);
 
+// ── Settled payment history (all farmers) ──
+router.get('/settlements', paymentController.getAllSettledPayments);
+router.get('/history', paymentController.getAllSettledPayments);
+
 // ── Farmer payment history (must remain after named subpaths) ──
 router.get('/:farmerId', paymentController.getPaymentsByFarmer);
 

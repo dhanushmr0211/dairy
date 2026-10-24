@@ -171,3 +171,20 @@ export function getDistributionHistory(params = {}) {
   const query = new URLSearchParams(params).toString();
   return request(`/wallet/distribution/history${query ? `?${query}` : ''}`);
 }
+
+export function deleteDistributionRecord(id) {
+  return request(`/wallet/distributions/${id}`, { method: 'DELETE' });
+}
+
+export function clearDistributionRecords(filter = 'all') {
+  return request(`/wallet/distributions?filter=${filter}`, { method: 'DELETE' });
+}
+
+export function getSettledPayments() {
+  return request('/payments/settlements');
+}
+
+export function deleteSettledPayment(id) {
+  return request(`/payments/${id}`, { method: 'DELETE' });
+}
+
