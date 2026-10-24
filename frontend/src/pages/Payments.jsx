@@ -125,11 +125,16 @@ export default function Payments() {
 
     try {
       setStartingCycle(true);
+      const [y, m, d] = cycleForm.startDate.split('-').map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const isFullMonth = Number(cycleForm.durationDays) === 30 && d === 1 && daysInMonth === 31;
+
       const res = await startCycle({
         farmerId: Number(selectedFarmerId),
         startDate: cycleForm.startDate,
         durationDays: Number(cycleForm.durationDays),
         ratePerLiter: Number(cycleForm.ratePerLiter),
+        ...(isFullMonth ? { cycleType: 'calendar_month' } : {}),
       });
       showToast(`Cycle #${res.id} (${res.startDate} to ${res.endDate}) created successfully!`);
       loadFarmerData(selectedFarmerId);
@@ -312,7 +317,7 @@ export default function Payments() {
                       onChange={(e) => setCycleForm({ ...cycleForm, durationDays: e.target.value })}
                     >
                       <option value={15}>15 Days Period</option>
-                      <option value={30}>30 Days Period</option>
+                      <option value={30}>30 Days Period (Full Month)</option>
                     </select>
                   </div>
 
@@ -725,7 +730,7 @@ export default function Payments() {
                     onChange={(e) => setEditForm({ ...editForm, durationDays: Number(e.target.value) })}
                   >
                     <option value={15}>15 Days Period</option>
-                    <option value={30}>30 Days Period</option>
+                    <option value={30}>30 Days Period (Full Month)</option>
                   </select>
                 </div>
 

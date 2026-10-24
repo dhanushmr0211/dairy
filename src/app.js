@@ -52,6 +52,7 @@ app.get('/health', (req, res) => {
 app.use('/farmers', farmerRoutes);
 app.use('/cycles', cycleRoutes);
 app.use('/milk', milkRoutes);
+app.use('/milk-entries', milkRoutes);
 app.use('/feed', feedRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/dashboard', dashboardRoutes);

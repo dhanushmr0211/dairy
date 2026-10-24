@@ -4,7 +4,7 @@ const farmerModel = require('../models/farmerModel');
 const milkModel = require('../models/milkModel');
 const paymentModel = require('../models/paymentModel');
 const { getCyclePaymentSummary } = require('../utils/paymentCalculator');
-const { resolveCycleDates, addDays, getInclusiveDays } = require('../utils/cycleDates');
+const { resolveCycleDates, addDays, getInclusiveDays, getDaysInMonth } = require('../utils/cycleDates');
 const db = require('../config/db');
 const {
   parsePositiveInteger,
@@ -52,11 +52,32 @@ const startCycle = asyncHandler(async (req, res) => {
   }
 
   // Resolve dates using cycleDates utility (handles 15_days, 30_days, calendar_month, leap years, etc.)
+  let effectiveCycleType = cycleType;
+  let effectiveEndDate = reqEndDate ? toIsoDateString(parseValidDate(reqEndDate)) : undefined;
+
+  // If user requests a 30-day / full-month cycle starting on the 1st of a 31-day month (e.g. Oct 1):
+  // Automatically resolve as calendar_month so it ends on the 31st (e.g. Oct 31)
+  if (!effectiveCycleType && (durationDays == 30 || durationDays === '30_days') && resolvedStartDateStr && resolvedStartDateStr.endsWith('-01')) {
+    const [y, m] = resolvedStartDateStr.split('-').map(Number);
+    if (getDaysInMonth(y, m) === 31) {
+      effectiveCycleType = 'calendar_month';
+    }
+  }
+
+  // If user requests a 15-day cycle starting on the 16th of a 31-day month (e.g. Oct 16):
+  // Automatically extend to the 31st (e.g. Oct 31) so the final day of the month is covered
+  if (!effectiveEndDate && (durationDays == 15 || durationDays === '15_days') && resolvedStartDateStr && resolvedStartDateStr.endsWith('-16')) {
+    const [y, m] = resolvedStartDateStr.split('-').map(Number);
+    if (getDaysInMonth(y, m) === 31) {
+      effectiveEndDate = `${y}-${String(m).padStart(2, '0')}-31`;
+    }
+  }
+
   const resolved = resolveCycleDates({
     startDate: resolvedStartDateStr,
-    endDate: reqEndDate ? toIsoDateString(parseValidDate(reqEndDate)) : undefined,
+    endDate: effectiveEndDate,
     durationDays,
-    cycleType,
+    cycleType: effectiveCycleType,
     month,
     year,
   });
@@ -306,7 +327,7 @@ const updateCycle = asyncHandler(async (req, res) => {
           cycle2StartDate,
           cycle2EndDate,
           cycle2Duration,
-          cycle2Duration === 15 ? '15_days' : 'custom',
+          '15_days',
           parsedRate,
           cycle2DueDate,
           'active',
@@ -568,6 +589,20 @@ const updateCycle = asyncHandler(async (req, res) => {
     let resolvedType = cycleType || cycle.cycle_type;
 
     if (startDate || endDate || durationDays || cycleType) {
+      // If 30-day on 1st of a 31-day month:
+      if ((resolvedDuration == 30 || resolvedDuration === '30_days') && resolvedStartDate && resolvedStartDate.endsWith('-01')) {
+        const [y, m] = resolvedStartDate.split('-').map(Number);
+        if (getDaysInMonth(y, m) === 31) {
+          resolvedType = 'calendar_month';
+        }
+      }
+      if (!resolvedEndDate && (resolvedDuration == 15 || resolvedDuration === '15_days') && resolvedStartDate && resolvedStartDate.endsWith('-16')) {
+        const [y, m] = resolvedStartDate.split('-').map(Number);
+        if (getDaysInMonth(y, m) === 31) {
+          resolvedEndDate = `${y}-${String(m).padStart(2, '0')}-31`;
+        }
+      }
+
       const resolved = resolveCycleDates({
         startDate: resolvedStartDate,
         endDate: resolvedEndDate,

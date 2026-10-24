@@ -1,6 +1,24 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Milk, UserCheck, CheckCircle2, PlusCircle, Calendar, Clock, Save, BarChart3, Phone, ClipboardList, RotateCcw, Sun, Moon } from 'lucide-react';
-import { getFarmers, addMilkEntry, getMilkByFarmer } from '../api';
+import { 
+  Milk, 
+  UserCheck, 
+  CheckCircle2, 
+  PlusCircle, 
+  Calendar, 
+  Clock, 
+  Save, 
+  BarChart3, 
+  Phone, 
+  ClipboardList, 
+  RotateCcw, 
+  Sun, 
+  Moon,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle
+} from 'lucide-react';
+import { getFarmers, addMilkEntry, getMilkByFarmer, updateMilkEntry, deleteMilkEntry } from '../api';
 import { useToast } from '../context/ToastContext';
 
 export default function MilkEntries() {
@@ -9,6 +27,20 @@ export default function MilkEntries() {
   const [entries, setEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit modal state
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    farmerId: '',
+    date: '',
+    time: 'morning',
+    liters: '',
+  });
+  const [updatingEntry, setUpdatingEntry] = useState(false);
+
+  // Delete modal state
+  const [entryToDelete, setEntryToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const [formData, setFormData] = useState({
@@ -78,6 +110,82 @@ export default function MilkEntries() {
     }
   };
 
+  // ── Edit Entry Handlers ──
+  const openEditModal = (entry) => {
+    if (!entry) return;
+    const formattedDate = typeof entry.date === 'string'
+      ? entry.date.split('T')[0]
+      : new Date(entry.date).toISOString().split('T')[0];
+
+    setEditingEntry(entry);
+    setEditFormData({
+      farmerId: String(entry.farmer_id),
+      date: formattedDate,
+      time: entry.time,
+      liters: String(entry.liters),
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingEntry(null);
+    setUpdatingEntry(false);
+  };
+
+  const handleUpdateSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingEntry) return;
+
+    if (!editFormData.liters || Number(editFormData.liters) <= 0) {
+      showToast('Milk quantity must be greater than 0', 'error');
+      return;
+    }
+
+    try {
+      setUpdatingEntry(true);
+      await updateMilkEntry(editingEntry.id, {
+        farmerId: Number(editFormData.farmerId),
+        date: editFormData.date,
+        time: editFormData.time,
+        liters: Number(editFormData.liters),
+      });
+
+      showToast('Milk entry updated successfully!');
+      closeEditModal();
+      fetchEntries(selectedFarmerId);
+    } catch (err) {
+      showToast(err.message || 'Failed to update milk entry', 'error');
+    } finally {
+      setUpdatingEntry(false);
+    }
+  };
+
+  // ── Delete Entry Handlers ──
+  const openDeleteModal = (entry) => {
+    if (!entry) return;
+    setEntryToDelete(entry);
+  };
+
+  const closeDeleteModal = () => {
+    setEntryToDelete(null);
+    setDeleting(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!entryToDelete) return;
+
+    try {
+      setDeleting(true);
+      await deleteMilkEntry(entryToDelete.id);
+      showToast('Milk entry deleted successfully!');
+      closeDeleteModal();
+      fetchEntries(selectedFarmerId);
+    } catch (err) {
+      showToast(err.message || 'Failed to delete milk entry', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const selectedFarmer = farmers.find((f) => String(f.id) === String(selectedFarmerId));
 
   // Group entries by date: 1 row per day with Morning and Evening columns
@@ -93,9 +201,9 @@ export default function MilkEntries() {
           date: dateKey,
           rawDate: entry.date,
           morning: null,
-          morningEntryId: null,
+          morningEntry: null,
           evening: null,
-          eveningEntryId: null,
+          eveningEntry: null,
           cycleId: entry.cycle_id,
         });
       }
@@ -103,10 +211,10 @@ export default function MilkEntries() {
       const liters = Number(entry.liters || 0);
       if (entry.time === 'morning') {
         row.morning = (row.morning !== null ? row.morning : 0) + liters;
-        row.morningEntryId = entry.id;
+        row.morningEntry = entry;
       } else if (entry.time === 'evening') {
         row.evening = (row.evening !== null ? row.evening : 0) + liters;
-        row.eveningEntryId = entry.id;
+        row.eveningEntry = entry;
       }
       if (entry.cycle_id) {
         row.cycleId = entry.cycle_id;
@@ -124,7 +232,7 @@ export default function MilkEntries() {
           <Milk size={28} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Daily Milk Entry
         </h2>
         <p style={{ fontSize: 'var(--fs-base)', color: 'var(--clr-text-secondary)', margin: 0 }}>
-          Record daily morning or evening milk collection for farmers
+          Record, correct, or review daily morning and evening milk collection for farmers
         </p>
       </div>
 
@@ -159,67 +267,73 @@ export default function MilkEntries() {
           </label>
         </div>
 
-        <select
-          id="milk-farmer-select"
-          className="form-select"
-          style={{ 
-            flex: '1 1 300px', 
-            fontSize: 'var(--fs-md)', 
-            padding: '0.75rem 1rem', 
-            fontWeight: 600,
-            borderRadius: 'var(--radius-md)',
-            border: '2px solid #94a3b8',
-            color: '#0f172a',
-            backgroundColor: '#ffffff'
-          }}
-          value={selectedFarmerId}
-          onChange={(e) => setSelectedFarmerId(e.target.value)}
-        >
-          {farmers.length === 0 && <option value="">No farmers found</option>}
-          {farmers.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name} — Phone: {f.phone}
-            </option>
-          ))}
-        </select>
+        <div style={{ flex: '1 1 300px', minWidth: '260px' }}>
+          <select
+            id="milk-farmer-select"
+            className="form-select"
+            style={{
+              fontSize: 'var(--fs-lg)',
+              fontWeight: 700,
+              padding: '0.75rem 1.25rem',
+              borderRadius: 'var(--radius-md)',
+              border: '2px solid var(--clr-primary)',
+              background: '#f8fafc',
+              color: 'var(--clr-text)',
+              width: '100%',
+              cursor: 'pointer'
+            }}
+            value={selectedFarmerId}
+            onChange={(e) => setSelectedFarmerId(e.target.value)}
+          >
+            <option value="" disabled>-- Choose a Farmer --</option>
+            {farmers.map((farmer) => (
+              <option key={farmer.id} value={farmer.id}>
+                {farmer.name} ({farmer.phone || 'No phone'}) - Rate: ₹{Number(farmer.rate_per_liter || 0).toFixed(2)}/L
+              </option>
+            ))}
+          </select>
+        </div>
 
         {selectedFarmer && (
-          <span 
+          <div 
             style={{ 
-              background: '#e0f2fe', 
-              color: '#0369a1', 
-              padding: '0.45rem 1rem', 
-              borderRadius: '9999px', 
-              fontWeight: 700, 
-              fontSize: 'var(--fs-sm)',
-              border: '1px solid #7dd3fc'
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              background: '#f0fdf4',
+              padding: '0.6rem 1.25rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1.5px solid #86efac'
             }}
           >
-            <CheckCircle2 size={16} strokeWidth={2.5} style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} /> Selected: {selectedFarmer.name}
-          </span>
+            <CheckCircle2 size={20} strokeWidth={2.5} style={{ color: "#16a34a" }} />
+            <div>
+              <span style={{ fontSize: 'var(--fs-xs)', color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>
+                Active Profile
+              </span>
+              <div style={{ fontSize: 'var(--fs-md)', fontWeight: 800, color: '#14532d' }}>
+                {selectedFarmer.name}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* ── Main Milk Entry Form Card ── */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div 
-          className="card"
-          style={{
-            padding: '1.75rem',
-            border: '2px solid var(--clr-primary)',
-            boxShadow: 'var(--shadow-md)',
-            borderRadius: 'var(--radius-xl)'
-          }}
-        >
-          <div className="card-header" style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
-            <h3 className="card-title" style={{ fontSize: 'var(--fs-xl)', color: 'var(--clr-primary-dim)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <PlusCircle size={22} strokeWidth={2.5} /> Enter Milk Details
-            </h3>
-          </div>
+      {/* ── Main Layout: Record Milk Entry Form ── */}
+      <div className="card" style={{ padding: '1.75rem', marginBottom: '2rem', borderRadius: 'var(--radius-xl)' }}>
+        <div className="card-header" style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+          <h3 className="card-title" style={{ fontSize: 'var(--fs-xl)', color: 'var(--clr-text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <PlusCircle size={24} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Record Milk Entry
+          </h3>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 500 }}>
+            Enter morning or evening milk quantity for the selected date
+          </span>
+        </div>
 
+        <div>
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* Collection Date */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+              {/* Date Selection */}
               <div className="form-group">
                 <label 
                   htmlFor="milk-date-input" 
@@ -233,7 +347,7 @@ export default function MilkEntries() {
                     gap: '0.35rem' 
                   }}
                 >
-                  <Calendar size={18} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Date of Collection:
+                  <Calendar size={18} strokeWidth={2.5} style={{ color: "var(--clr-primary)" }} /> Entry Date:
                 </label>
                 <input
                   id="milk-date-input"
@@ -377,7 +491,7 @@ export default function MilkEntries() {
         </div>
       </div>
 
-      {/* ── Milk History Records Table (1 Row Per Date with Morning & Evening Columns) ── */}
+      {/* ── Milk History Records Table (1 Row Per Date with Morning & Evening Columns + Edit/Delete) ── */}
       <div className="card" style={{ padding: '1.75rem', borderRadius: 'var(--radius-xl)' }}>
         <div className="card-header" style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -448,50 +562,147 @@ export default function MilkEntries() {
                       <td style={{ padding: '1.1rem 1rem', fontSize: 'var(--fs-base)', fontWeight: 700 }}>
                         {formattedDate}
                       </td>
+
+                      {/* Morning Session Cell with Quick Edit & Delete */}
                       <td style={{ padding: '1.1rem 1rem' }}>
-                        {row.morning !== null ? (
-                          <span 
-                            style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '6px', 
-                              fontSize: 'var(--fs-base)', 
-                              fontWeight: 700, 
-                              color: '#92400e', 
-                              background: '#fef3c7', 
-                              border: '1px solid #fde68a', 
-                              padding: '0.3rem 0.75rem', 
-                              borderRadius: '8px' 
-                            }}
-                          >
-                            <Sun size={15} strokeWidth={2.5} /> {Number(row.morning).toFixed(2)} L
-                          </span>
+                        {row.morning !== null && row.morningEntry ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span 
+                              style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                fontSize: 'var(--fs-base)', 
+                                fontWeight: 700, 
+                                color: '#92400e', 
+                                background: '#fef3c7', 
+                                border: '1px solid #fde68a', 
+                                padding: '0.35rem 0.75rem', 
+                                borderRadius: '8px' 
+                              }}
+                            >
+                              <Sun size={15} strokeWidth={2.5} /> {Number(row.morning).toFixed(2)} L
+                            </span>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                type="button"
+                                title="Edit Morning Milk Entry"
+                                onClick={() => openEditModal(row.morningEntry)}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #bae6fd',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  color: '#0284c7',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Pencil size={12} strokeWidth={2.5} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete Morning Milk Entry"
+                                onClick={() => openDeleteModal(row.morningEntry)}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #fecaca',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Trash2 size={12} strokeWidth={2.5} /> Del
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <span style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-md)', fontWeight: 600 }}>—</span>
                         )}
                       </td>
+
+                      {/* Evening Session Cell with Quick Edit & Delete */}
                       <td style={{ padding: '1.1rem 1rem' }}>
-                        {row.evening !== null ? (
-                          <span 
-                            style={{ 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '6px', 
-                              fontSize: 'var(--fs-base)', 
-                              fontWeight: 700, 
-                              color: '#3730a3', 
-                              background: '#e0e7ff', 
-                              border: '1px solid #c7d2fe', 
-                              padding: '0.3rem 0.75rem', 
-                              borderRadius: '8px' 
-                            }}
-                          >
-                            <Moon size={15} strokeWidth={2.5} /> {Number(row.evening).toFixed(2)} L
-                          </span>
+                        {row.evening !== null && row.eveningEntry ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span 
+                              style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                fontSize: 'var(--fs-base)', 
+                                fontWeight: 700, 
+                                color: '#3730a3', 
+                                background: '#e0e7ff', 
+                                border: '1px solid #c7d2fe', 
+                                padding: '0.35rem 0.75rem', 
+                                borderRadius: '8px' 
+                              }}
+                            >
+                              <Moon size={15} strokeWidth={2.5} /> {Number(row.evening).toFixed(2)} L
+                            </span>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                type="button"
+                                title="Edit Evening Milk Entry"
+                                onClick={() => openEditModal(row.eveningEntry)}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #bae6fd',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  color: '#0284c7',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Pencil size={12} strokeWidth={2.5} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete Evening Milk Entry"
+                                onClick={() => openDeleteModal(row.eveningEntry)}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #fecaca',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Trash2 size={12} strokeWidth={2.5} /> Del
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <span style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-md)', fontWeight: 600 }}>—</span>
                         )}
                       </td>
+
                       <td style={{ padding: '1.1rem 1rem' }}>
                         <strong style={{ color: 'var(--clr-primary-dim)', fontSize: '1.25rem', fontWeight: 800 }}>
                           {dayTotal.toFixed(2)} L
@@ -565,6 +776,427 @@ export default function MilkEntries() {
           </div>
         </div>
       </div>
+
+      {/* ── Edit Milk Entry Modal ── */}
+      {editingEntry && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={closeEditModal}
+        >
+          <div 
+            style={{
+              background: '#ffffff',
+              borderRadius: 'var(--radius-xl)',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              border: '1px solid var(--clr-border)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.15s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              style={{ 
+                padding: '1.25rem 1.5rem', 
+                borderBottom: '1px solid #e2e8f0', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                background: '#f8fafc' 
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Pencil size={20} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} />
+                <h3 style={{ margin: 0, fontSize: 'var(--fs-lg)', fontWeight: 800, color: 'var(--clr-text)' }}>
+                  Edit Milk Entry #{editingEntry.id}
+                </h3>
+              </div>
+              <button 
+                type="button"
+                onClick={closeEditModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--clr-text-muted)',
+                  padding: '4px',
+                  borderRadius: '6px'
+                }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSubmit} style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Farmer Select */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label 
+                    style={{ 
+                      fontSize: 'var(--fs-sm)', 
+                      fontWeight: 700, 
+                      color: 'var(--clr-text)', 
+                      marginBottom: '0.35rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.35rem' 
+                    }}
+                  >
+                    <UserCheck size={16} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} /> Farmer:
+                  </label>
+                  <select
+                    className="form-select"
+                    style={{
+                      fontSize: 'var(--fs-base)',
+                      fontWeight: 600,
+                      padding: '0.7rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '2px solid #cbd5e1',
+                      width: '100%'
+                    }}
+                    value={editFormData.farmerId}
+                    onChange={(e) => setEditFormData({ ...editFormData, farmerId: e.target.value })}
+                    required
+                  >
+                    {farmers.map((farmer) => (
+                      <option key={farmer.id} value={farmer.id}>
+                        {farmer.name} ({farmer.phone || 'No phone'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Entry Date */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label 
+                    style={{ 
+                      fontSize: 'var(--fs-sm)', 
+                      fontWeight: 700, 
+                      color: 'var(--clr-text)', 
+                      marginBottom: '0.35rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.35rem' 
+                    }}
+                  >
+                    <Calendar size={16} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} /> Entry Date:
+                  </label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    style={{
+                      fontSize: 'var(--fs-base)',
+                      fontWeight: 600,
+                      padding: '0.7rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '2px solid #cbd5e1',
+                      width: '100%'
+                    }}
+                    value={editFormData.date}
+                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                {/* Session / Shift */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label 
+                    style={{ 
+                      fontSize: 'var(--fs-sm)', 
+                      fontWeight: 700, 
+                      color: 'var(--clr-text)', 
+                      marginBottom: '0.35rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.35rem' 
+                    }}
+                  >
+                    <Clock size={16} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} /> Shift / Session:
+                  </label>
+                  <select
+                    className="form-select"
+                    style={{
+                      fontSize: 'var(--fs-base)',
+                      fontWeight: 600,
+                      padding: '0.7rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '2px solid #cbd5e1',
+                      width: '100%'
+                    }}
+                    value={editFormData.time}
+                    onChange={(e) => setEditFormData({ ...editFormData, time: e.target.value })}
+                    required
+                  >
+                    <option value="morning">Morning (AM)</option>
+                    <option value="evening">Evening (PM)</option>
+                  </select>
+                </div>
+
+                {/* Liters Input */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label 
+                    style={{ 
+                      fontSize: 'var(--fs-md)', 
+                      fontWeight: 800, 
+                      color: 'var(--clr-primary-dim)', 
+                      marginBottom: '0.35rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.35rem' 
+                    }}
+                  >
+                    <Milk size={16} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} /> Milk Quantity (Liters):
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      className="form-input"
+                      style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 800,
+                        padding: '0.75rem 3rem 0.75rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '2px solid var(--clr-primary)',
+                        background: '#f0f9ff',
+                        color: '#0369a1',
+                        width: '100%'
+                      }}
+                      value={editFormData.liters}
+                      onChange={(e) => setEditFormData({ ...editFormData, liters: e.target.value })}
+                      required
+                    />
+                    <span 
+                      style={{ 
+                        position: 'absolute', 
+                        right: '1rem', 
+                        top: '50%', 
+                        transform: 'translateY(-50%)', 
+                        fontWeight: 800, 
+                        color: 'var(--clr-primary)', 
+                        fontSize: '1rem',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      L
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div 
+                style={{ 
+                  marginTop: '1.75rem', 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: '0.75rem' 
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={closeEditModal}
+                  disabled={updatingEntry}
+                  style={{ fontWeight: 600, padding: '0.65rem 1.25rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={updatingEntry}
+                  style={{ 
+                    fontWeight: 800, 
+                    padding: '0.65rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {updatingEntry ? (
+                    <>
+                      <span className="spinner"></span> Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} strokeWidth={2.5} /> Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {entryToDelete && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+          onClick={closeDeleteModal}
+        >
+          <div 
+            style={{
+              background: '#ffffff',
+              borderRadius: 'var(--radius-xl)',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              border: '1px solid #fee2e2',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.15s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              style={{ 
+                padding: '1.25rem 1.5rem', 
+                borderBottom: '1px solid #fee2e2', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                background: '#fef2f2' 
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={22} strokeWidth={2.5} style={{ color: '#dc2626' }} />
+                <h3 style={{ margin: 0, fontSize: 'var(--fs-lg)', fontWeight: 800, color: '#991b1b' }}>
+                  Delete Milk Entry
+                </h3>
+              </div>
+              <button 
+                type="button"
+                onClick={closeDeleteModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--clr-text-muted)',
+                  padding: '4px',
+                  borderRadius: '6px'
+                }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: 'var(--fs-base)', color: 'var(--clr-text)' }}>
+                Are you sure you want to delete this milk entry? Only this individual entry will be removed:
+              </p>
+
+              <div 
+                style={{ 
+                  background: '#f8fafc', 
+                  border: '1.5px solid #e2e8f0', 
+                  borderRadius: 'var(--radius-md)', 
+                  padding: '1rem',
+                  marginBottom: '1rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Date:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text)' }}>
+                    {typeof entryToDelete.date === 'string' ? entryToDelete.date.split('T')[0] : new Date(entryToDelete.date).toISOString().split('T')[0]}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Shift:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)', textTransform: 'capitalize', color: 'var(--clr-text)' }}>
+                    {entryToDelete.time}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Quantity:</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: '#dc2626', fontWeight: 800 }}>
+                    {Number(entryToDelete.liters).toFixed(2)} Litres
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Cycle ID:</span>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-muted)' }}>
+                    #{entryToDelete.cycle_id}
+                  </span>
+                </div>
+              </div>
+
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: '0.75rem',
+                  marginTop: '1.5rem'
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={closeDeleteModal}
+                  disabled={deleting}
+                  style={{ fontWeight: 600, padding: '0.65rem 1.25rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  style={{ 
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 800, 
+                    padding: '0.65rem 1.5rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {deleting ? (
+                    <>
+                      <span className="spinner"></span> Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} strokeWidth={2.5} /> Delete Entry
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -85,6 +85,14 @@ export function getMilkByFarmer(farmerId) {
   return request(`/milk/${farmerId}`);
 }
 
+export function updateMilkEntry(entryId, body) {
+  return request(`/milk-entries/${entryId}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export function deleteMilkEntry(entryId) {
+  return request(`/milk-entries/${entryId}`, { method: 'DELETE' });
+}
+
 // ── Feed ──
 export function addFeedRecord(body) {
   return request('/feed', { method: 'POST', body: JSON.stringify(body) });

@@ -29,8 +29,8 @@ async function getAllFarmers({ status } = {}) {
   return result.rows;
 }
 
-async function findFarmerById(farmerId) {
-  const result = await db.query(
+async function findFarmerById(farmerId, client = db) {
+  const result = await client.query(
     `SELECT id, name, phone, COALESCE(status, 'active') AS status, created_at
      FROM farmers
      WHERE id = $1

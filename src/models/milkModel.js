@@ -39,19 +39,29 @@ async function findMilkEntryByIdForUpdate(id, client = db) {
   return result.rows[0] || null;
 }
 
-async function updateMilkEntry(id, { date, time, liters, cycleId }, client = db) {
+async function updateMilkEntry(id, { farmerId, date, time, liters, cycleId }, client = db) {
   const result = await client.query(
     `UPDATE milk_entries
-     SET date = COALESCE($1, date),
-         time = COALESCE($2, time),
-         liters = COALESCE($3, liters),
-         cycle_id = COALESCE($4, cycle_id)
-     WHERE id = $5
+     SET farmer_id = COALESCE($1, farmer_id),
+         date = COALESCE($2, date),
+         time = COALESCE($3, time),
+         liters = COALESCE($4, liters),
+         cycle_id = COALESCE($5, cycle_id)
+     WHERE id = $6
      RETURNING id, farmer_id, cycle_id, date, time, liters, created_at`,
-    [date, time, liters, cycleId, id]
+    [farmerId, date, time, liters, cycleId, id]
   );
 
   return result.rows[0] || null;
+}
+
+async function checkDuplicateMilkEntry({ farmerId, date, time, excludeEntryId }, client = db) {
+  const query = excludeEntryId
+    ? `SELECT id FROM milk_entries WHERE farmer_id = $1 AND date = $2 AND time = $3 AND id != $4 LIMIT 1`
+    : `SELECT id FROM milk_entries WHERE farmer_id = $1 AND date = $2 AND time = $3 LIMIT 1`;
+  const params = excludeEntryId ? [farmerId, date, time, excludeEntryId] : [farmerId, date, time];
+  const res = await client.query(query, params);
+  return res.rows[0] || null;
 }
 
 async function deleteMilkEntry(id, client = db) {
@@ -141,5 +151,6 @@ module.exports = {
   getTodayMorningMilk,
   getTodayEveningMilk,
   getTodayMilkTotal,
+  checkDuplicateMilkEntry,
 };
 
