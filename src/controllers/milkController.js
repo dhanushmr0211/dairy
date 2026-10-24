@@ -98,7 +98,7 @@ const addMilkEntry = asyncHandler(async (req, res) => {
 });
 
 const getMilkEntryById = asyncHandler(async (req, res) => {
-  const parsedId = parsePositiveInteger(req.params.id);
+  const parsedId = parsePositiveInteger(req.params.id || req.params.entryId);
   if (!parsedId) {
     return res.status(400).json({ success: false, message: 'Invalid milk entry ID.' });
   }
@@ -125,7 +125,7 @@ const getMilkEntryById = asyncHandler(async (req, res) => {
 });
 
 const updateMilkEntry = asyncHandler(async (req, res) => {
-  const parsedId = parsePositiveInteger(req.params.id);
+  const parsedId = parsePositiveInteger(req.params.id || req.params.entryId);
   if (!parsedId) {
     return res.status(400).json({ success: false, message: 'Invalid milk entry ID.' });
   }
@@ -329,7 +329,7 @@ const updateMilkEntry = asyncHandler(async (req, res) => {
 });
 
 const deleteMilkEntry = asyncHandler(async (req, res) => {
-  const parsedId = parsePositiveInteger(req.params.id);
+  const parsedId = parsePositiveInteger(req.params.id || req.params.entryId);
   if (!parsedId) {
     return res.status(400).json({ success: false, message: 'Invalid milk entry ID.' });
   }
@@ -406,7 +406,8 @@ const deleteMilkEntry = asyncHandler(async (req, res) => {
 });
 
 const getMilkByFarmer = asyncHandler(async (req, res) => {
-  const parsedFarmerId = parsePositiveInteger(req.params.farmerId);
+  const farmerIdParam = req.params.farmerId || req.params.id;
+  const parsedFarmerId = parsePositiveInteger(farmerIdParam);
   if (!parsedFarmerId) {
     return res.status(400).json({ success: false, message: 'farmerId must be a positive integer.' });
   }
