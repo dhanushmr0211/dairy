@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wheat, Info, RotateCcw } from 'lucide-react';
 import { getFarmers, addFeedRecord, getFeedByFarmer } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function FeedRecords() {
   const [farmers, setFarmers] = useState([]);
@@ -231,14 +232,14 @@ export default function FeedRecords() {
                 {records.map((rec) => (
                   <tr key={rec.id}>
                     <td><strong>#{rec.id}</strong></td>
-                    <td>{new Date(rec.date).toLocaleDateString()}</td>
+                    <td>{formatDate(rec.date)}</td>
                     <td><strong>{rec.item}</strong></td>
                     <td>{Number(rec.quantity).toFixed(2)}</td>
                     <td style={{ color: 'var(--clr-danger)', fontWeight: 600 }}>
                       ₹{Number(rec.amount).toFixed(2)}
                     </td>
                     <td style={{ color: 'var(--clr-text-dim)' }}>
-                      {new Date(rec.created_at).toLocaleDateString()}
+                      {formatDate(rec.created_at)}
                     </td>
                   </tr>
                 ))}

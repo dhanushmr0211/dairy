@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserPlus, FileText, Users, BarChart3, RotateCcw } from 'lucide-react';
 import { getFarmers, createFarmer, getFarmerSummary } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function Farmers() {
   const [farmers, setFarmers] = useState([]);
@@ -129,7 +130,7 @@ export default function Farmers() {
               </div>
             </div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-              Cycle Duration: {new Date(selectedSummary.active_cycle.start_date).toLocaleDateString()} to {new Date(selectedSummary.active_cycle.end_date).toLocaleDateString()} @ ₹{selectedSummary.active_cycle.rate_per_liter}/L
+              Cycle Duration: {formatDate(selectedSummary.active_cycle.start_date)} to {formatDate(selectedSummary.active_cycle.end_date)} @ ₹{selectedSummary.active_cycle.rate_per_liter}/L
             </div>
           </div>
         )}
@@ -168,7 +169,7 @@ export default function Farmers() {
                     <td><strong>#{farmer.id}</strong></td>
                     <td>{farmer.name}</td>
                     <td>{farmer.phone}</td>
-                    <td>{new Date(farmer.created_at || Date.now()).toLocaleDateString()}</td>
+                    <td>{formatDate(farmer.created_at)}</td>
                     <td>
                       <button
                         className="btn btn-outline btn-sm"

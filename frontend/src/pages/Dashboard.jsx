@@ -7,6 +7,7 @@ import {
   paySelectedCycles
 } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -333,7 +334,7 @@ export default function Dashboard() {
                           <div>
                             <strong>{c.farmerName}</strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
-                              Cycle #{c.cycleId} ({c.startDate} → {c.endDate})
+                              Cycle #{c.cycleId} ({formatDate(c.startDate)} → {formatDate(c.endDate)})
                             </div>
                           </div>
                           <strong style={{ color: 'var(--clr-success)', fontSize: 'var(--fs-md)' }}>
@@ -479,7 +480,7 @@ export default function Dashboard() {
                           </td>
                           <td>
                             <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600 }}>
-                              {new Date(item.startDate).toLocaleDateString()} → {new Date(item.endDate).toLocaleDateString()}
+                              {formatDate(item.startDate)} → {formatDate(item.endDate)}
                             </div>
                             <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
                               {item.durationDays || 15} Days (Cycle #{item.cycleId})
@@ -513,7 +514,7 @@ export default function Dashboard() {
                                   <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><AlertTriangle size={13} strokeWidth={2.5} /> {item.overdueDays} Days Overdue</span>
                                 </span>
                                 <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
-                                  Due: {new Date(item.paymentDueDate).toLocaleDateString()}
+                                  Due: {formatDate(item.paymentDueDate)}
                                 </span>
                               </div>
                             ) : item.isDueToday ? (
@@ -526,7 +527,7 @@ export default function Dashboard() {
                                   Active ({item.daysRemaining} days left)
                                 </span>
                                 <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
-                                  Due: {new Date(item.paymentDueDate).toLocaleDateString()}
+                                  Due: {formatDate(item.paymentDueDate)}
                                 </span>
                               </div>
                             )}
@@ -622,7 +623,7 @@ export default function Dashboard() {
             <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--clr-border)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', marginBottom: '1.25rem' }}>
               {calcResult.selectedCycles.map((c) => (
                 <div key={c.cycleId} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0.5rem', borderBottom: '1px solid var(--clr-border-subtle)', fontSize: 'var(--fs-xs)' }}>
-                  <span><strong>{c.farmerName}</strong> (Cycle #{c.cycleId}: {c.startDate} → {c.endDate})</span>
+                  <span><strong>{c.farmerName}</strong> (Cycle #{c.cycleId}: {formatDate(c.startDate)} → {formatDate(c.endDate)})</span>
                   <strong style={{ color: 'var(--clr-success)' }}>₹{Number(c.finalAmount).toFixed(2)}</strong>
                 </div>
               ))}

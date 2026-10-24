@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getFarmers, addMilkEntry, getMilkByFarmer, updateMilkEntry, deleteMilkEntry } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function MilkEntries() {
   const [farmers, setFarmers] = useState([]);
@@ -549,13 +550,7 @@ export default function MilkEntries() {
               <tbody>
                 {dailyEntries.map((row) => {
                   const dayTotal = (row.morning || 0) + (row.evening || 0);
-                  const dateObj = new Date(row.rawDate || row.date);
-                  const formattedDate = dateObj.toLocaleDateString(undefined, { 
-                    weekday: 'short',
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  });
+                  const formattedDate = formatDate(row.rawDate || row.date);
 
                   return (
                     <tr key={row.date}>
@@ -1125,7 +1120,7 @@ export default function MilkEntries() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Date:</span>
                   <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text)' }}>
-                    {typeof entryToDelete.date === 'string' ? entryToDelete.date.split('T')[0] : new Date(entryToDelete.date).toISOString().split('T')[0]}
+                    {formatDate(entryToDelete.date)}
                   </strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>

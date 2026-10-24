@@ -12,6 +12,7 @@ import {
   getUpcomingPayments,
 } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function Payments() {
   const [farmers, setFarmers] = useState([]);
@@ -136,7 +137,7 @@ export default function Payments() {
         ratePerLiter: Number(cycleForm.ratePerLiter),
         ...(isFullMonth ? { cycleType: 'calendar_month' } : {}),
       });
-      showToast(`Cycle #${res.id} (${res.startDate} to ${res.endDate}) created successfully!`);
+      showToast(`Cycle #${res.id} (${formatDate(res.startDate)} to ${formatDate(res.endDate)}) created successfully!`);
       loadFarmerData(selectedFarmerId);
     } catch (err) {
       showToast(err.message || 'Failed to create cycle', 'error');
@@ -387,9 +388,9 @@ export default function Payments() {
                           style={{ width: 18, height: 18, cursor: 'pointer' }}
                         />
                         <div>
-                          <strong>Cycle #{c.id}</strong> ({c.startDate} → {c.endDate})
+                          <strong>Cycle #{c.id}</strong> ({formatDate(c.startDate)} → {formatDate(c.endDate)})
                           <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-                            {Number(c.totalLiters || 0).toFixed(2)}L @ ₹{c.ratePerLiter}/L | Due: {c.paymentDueDate}
+                            {Number(c.totalLiters || 0).toFixed(2)}L @ ₹{c.ratePerLiter}/L | Due: {formatDate(c.paymentDueDate)}
                           </div>
                         </div>
                       </div>
@@ -479,9 +480,9 @@ export default function Payments() {
                         </td>
                         <td><strong>#{c.id}</strong></td>
                         <td>
-                          <div>{c.startDate} → {c.endDate}</div>
+                          <div>{formatDate(c.startDate)} → {formatDate(c.endDate)}</div>
                           <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
-                            {c.durationDays} Days (Due: {c.paymentDueDate})
+                            {c.durationDays} Days (Due: {formatDate(c.paymentDueDate)})
                           </span>
                         </td>
                         <td>₹{Number(c.ratePerLiter).toFixed(2)}/L</td>
@@ -592,9 +593,9 @@ export default function Payments() {
                             </td>
                             <td><strong>{item.farmerName}</strong></td>
                             <td>#{item.cycleId}</td>
-                            <td>{new Date(item.startDate).toLocaleDateString()} → {new Date(item.endDate).toLocaleDateString()}</td>
+                            <td>{formatDate(item.startDate)} → {formatDate(item.endDate)}</td>
                             <td>{Number(item.totalLiters).toFixed(2)}L</td>
-                            <td>{new Date(item.paymentDueDate).toLocaleDateString()}</td>
+                            <td>{formatDate(item.paymentDueDate)}</td>
                             <td>
                               <span className="badge" style={{ background: 'var(--clr-danger-light)', color: 'var(--clr-danger)', border: '1px solid var(--clr-danger-border)', fontWeight: 600 }}>
                                 {Math.abs(item.daysRemaining)} Days Overdue
@@ -657,9 +658,9 @@ export default function Payments() {
                             </td>
                             <td><strong>{item.farmerName}</strong></td>
                             <td>#{item.cycleId}</td>
-                            <td>{new Date(item.startDate).toLocaleDateString()} → {new Date(item.endDate).toLocaleDateString()}</td>
+                            <td>{formatDate(item.startDate)} → {formatDate(item.endDate)}</td>
                             <td>{Number(item.totalLiters).toFixed(2)}L</td>
-                            <td>{new Date(item.paymentDueDate).toLocaleDateString()}</td>
+                            <td>{formatDate(item.paymentDueDate)}</td>
                             <td>
                               {item.daysRemaining === 0 ? (
                                 <span className="badge badge-warning">Due Today</span>
@@ -701,7 +702,7 @@ export default function Payments() {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <h3><span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Pencil size={13} strokeWidth={2.5} /> Edit</span> Billing Cycle #{editingCycle.id || editingCycle.cycleId}</h3>
             <p style={{ color: 'var(--clr-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '1.25rem' }}>
-              Current Period: <strong>{editingCycle.startDate} → {editingCycle.endDate}</strong> ({editingCycle.durationDays || editingCycle.duration_days} Days)
+              Current Period: <strong>{formatDate(editingCycle.startDate)} → {formatDate(editingCycle.endDate)}</strong> ({editingCycle.durationDays || editingCycle.duration_days} Days)
             </p>
 
             <form onSubmit={handleSaveEdit}>

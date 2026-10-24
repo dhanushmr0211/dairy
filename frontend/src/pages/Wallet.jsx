@@ -35,6 +35,7 @@ import {
   deleteSettledPayment
 } from '../api';
 import { useToast } from '../context/ToastContext';
+import { formatDate } from '../utils/date';
 
 export default function Wallet() {
   const [summary, setSummary] = useState(null);
@@ -290,9 +291,7 @@ export default function Wallet() {
   // Safe formatting helpers
   const formatTxDate = (tx) => {
     const raw = tx.transactionDate || tx.transaction_date || tx.createdAt || tx.created_at;
-    if (!raw) return '—';
-    const d = new Date(raw);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+    return formatDate(raw);
   };
 
   const formatTxTime = (tx) => {
@@ -650,7 +649,7 @@ export default function Wallet() {
                       {filteredSettlements.map((p) => (
                         <tr key={p.id}>
                           <td>
-                            <strong>{new Date(p.paidDate || p.createdAt || Date.now()).toLocaleDateString()}</strong>
+                            <strong>{formatDate(p.paidDate || p.createdAt)}</strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
                               {new Date(p.createdAt || Date.now()).toLocaleTimeString()}
                             </div>
@@ -663,7 +662,7 @@ export default function Wallet() {
                           </td>
                           <td>
                             <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600 }}>
-                              {new Date(p.startDate).toLocaleDateString()} → {new Date(p.endDate).toLocaleDateString()}
+                              {formatDate(p.startDate)} → {formatDate(p.endDate)}
                             </div>
                             <span style={{ fontSize: '0.7rem', color: 'var(--clr-text-dim)' }}>
                               {p.durationDays || 15} Days (Cycle #{p.cycleId})
@@ -774,7 +773,7 @@ export default function Wallet() {
                       {distHistory.map((h) => (
                         <tr key={h.id}>
                           <td>
-                            <strong>{new Date(h.created_at || h.createdAt || Date.now()).toLocaleDateString()}</strong>
+                            <strong>{formatDate(h.created_at || h.createdAt)}</strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--clr-text-dim)' }}>
                               {new Date(h.created_at || h.createdAt || Date.now()).toLocaleTimeString()}
                             </div>
@@ -1032,7 +1031,7 @@ export default function Wallet() {
                         <div>
                           <strong>{c.farmerName}</strong>
                           <span style={{ color: 'var(--clr-text-dim)', marginLeft: '0.4rem' }}>
-                            (Cycle #{c.cycleId}: {c.startDate} → {c.endDate})
+                            (Cycle #{c.cycleId}: {formatDate(c.startDate)} → {formatDate(c.endDate)})
                           </span>
                         </div>
                         <strong style={{ color: 'var(--clr-success)' }}>
@@ -1336,7 +1335,7 @@ export default function Wallet() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Date & Time:</span>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-                    {new Date(distToDelete.created_at || distToDelete.createdAt || Date.now()).toLocaleString()}
+                    {formatDate(distToDelete.created_at || distToDelete.createdAt)} {new Date(distToDelete.created_at || distToDelete.createdAt || Date.now()).toLocaleTimeString()}
                   </span>
                 </div>
               </div>
@@ -1423,7 +1422,7 @@ export default function Wallet() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                   <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Billing Cycle:</span>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-                    Cycle #{settlementToDelete.cycleId} ({settlementToDelete.startDate} → {settlementToDelete.endDate})
+                    Cycle #{settlementToDelete.cycleId} ({formatDate(settlementToDelete.startDate)} → {formatDate(settlementToDelete.endDate)})
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
@@ -1435,7 +1434,7 @@ export default function Wallet() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Paid Date:</span>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)' }}>
-                    {settlementToDelete.paidDate}
+                    {formatDate(settlementToDelete.paidDate)}
                   </span>
                 </div>
               </div>
