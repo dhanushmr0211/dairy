@@ -141,13 +141,54 @@ async function getReservedAmount(client = db) {
   return Number(result.rows[0].reserved);
 }
 
+async function findTransactionById(id, client = db) {
+  const result = await client.query(
+    `SELECT id, transaction_type, amount, running_balance, transaction_date, reference, description, 
+            related_distribution_id, related_payment_id, idempotency_key, created_at
+     FROM wallet_ledger
+     WHERE id = $1
+     LIMIT 1`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async function recalculateRunningBalances(client = db) {
+  await client.query(`
+    WITH calculated AS (
+      SELECT id, SUM(amount) OVER (ORDER BY id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS new_running
+      FROM wallet_ledger
+    )
+    UPDATE wallet_ledger wl
+    SET running_balance = c.new_running
+    FROM calculated c
+    WHERE wl.id = c.id;
+  `);
+}
+
+async function deleteLedgerEntry(id, client = db) {
+  const result = await client.query(
+    `DELETE FROM wallet_ledger
+     WHERE id = $1
+     RETURNING id, transaction_type, amount, running_balance, transaction_date, reference, description`,
+    [id]
+  );
+  if (result.rows.length > 0) {
+    await recalculateRunningBalances(client);
+  }
+  return result.rows[0] || null;
+}
+
 module.exports = {
   getWalletBalance,
   getWalletBalanceForUpdate,
   createLedgerEntry,
   findReceiptByReference,
+  findTransactionById,
   getAllTransactions,
   getWalletSummary,
   getLatestReceipt,
   getReservedAmount,
+  recalculateRunningBalances,
+  deleteLedgerEntry,
 };

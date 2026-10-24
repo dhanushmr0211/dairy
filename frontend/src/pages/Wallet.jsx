@@ -1,8 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Landmark, ArrowDownLeft, ArrowUpRight, Scale, RotateCcw, Calendar, FileText, Zap, CreditCard, AlertTriangle, Plus, Minus } from 'lucide-react';
+import { 
+  Landmark, 
+  ArrowDownLeft, 
+  ArrowUpRight, 
+  Scale, 
+  RotateCcw, 
+  Calendar, 
+  FileText, 
+  Zap, 
+  CreditCard, 
+  AlertTriangle, 
+  Plus, 
+  Minus,
+  Sliders,
+  Trash2,
+  Pencil,
+  X
+} from 'lucide-react';
 import { 
   getWalletSummary, 
   getWalletTransactions, 
+  updateWalletBalance,
+  deleteWalletTransaction,
   recordWalletReceipt, 
   getDistributionPreview, 
   confirmDistribution,
@@ -24,6 +43,12 @@ export default function Wallet() {
   // Modals
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [distModalOpen, setDistModalOpen] = useState(false);
+  const [editBalanceModalOpen, setEditBalanceModalOpen] = useState(false);
+  const [newTargetBalance, setNewTargetBalance] = useState('');
+  const [balanceEditReason, setBalanceEditReason] = useState('');
+  const [submittingBalanceEdit, setSubmittingBalanceEdit] = useState(false);
+  const [txToDelete, setTxToDelete] = useState(null);
+  const [deletingTx, setDeletingTx] = useState(false);
 
   // Transaction Form State
   const [txType, setTxType] = useState('receipt'); // 'receipt', 'adjustment', 'farmer_payment'
@@ -134,6 +159,56 @@ export default function Wallet() {
     }
   };
 
+  const openEditBalanceModal = () => {
+    setNewTargetBalance(String(availableBal));
+    setBalanceEditReason('');
+    setEditBalanceModalOpen(true);
+  };
+
+  const handleSaveNewBalance = async (e) => {
+    e.preventDefault();
+    const balNum = Number(newTargetBalance);
+    if (!Number.isFinite(balNum) || balNum < 0) {
+      showToast('Please enter a valid non-negative balance', 'error');
+      return;
+    }
+
+    try {
+      setSubmittingBalanceEdit(true);
+      const res = await updateWalletBalance({
+        newBalance: balNum,
+        reason: balanceEditReason.trim() || undefined,
+      });
+      showToast(res.message || 'Wallet balance updated successfully!');
+      setEditBalanceModalOpen(false);
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to update wallet balance', 'error');
+    } finally {
+      setSubmittingBalanceEdit(false);
+    }
+  };
+
+  const openDeleteTxModal = (tx) => {
+    setTxToDelete(tx);
+  };
+
+  const handleConfirmDeleteTx = async () => {
+    if (!txToDelete) return;
+
+    try {
+      setDeletingTx(true);
+      await deleteWalletTransaction(txToDelete.id);
+      showToast('Transaction record deleted successfully!');
+      setTxToDelete(null);
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Failed to delete transaction', 'error');
+    } finally {
+      setDeletingTx(false);
+    }
+  };
+
   // Safe formatting helpers
   const formatTxDate = (tx) => {
     const raw = tx.transactionDate || tx.transaction_date || tx.createdAt || tx.created_at;
@@ -163,6 +238,13 @@ export default function Wallet() {
           <h2>Dairy Company Wallet</h2>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn btn-outline btn-sm" 
+            onClick={openEditBalanceModal}
+            style={{ fontWeight: 700, borderColor: '#0284c7', color: '#0284c7', background: '#f0f9ff' }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Sliders size={16} strokeWidth={2.5} /> Edit Balance</span>
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setReceiptModalOpen(true)}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><Plus size={16} strokeWidth={2.5} /> Record Received Payment</span>
           </button>
@@ -192,8 +274,30 @@ export default function Wallet() {
         <>
           {/* ═══ Top Summary Metric Cards ═══ */}
           <div className="stats-grid">
-            <div className="stat-card success">
-              <div className="stat-label">Available Wallet Balance</div>
+            <div className="stat-card success" style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div className="stat-label">Available Wallet Balance</div>
+                <button
+                  type="button"
+                  title="Edit Wallet Balance"
+                  onClick={openEditBalanceModal}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #86efac',
+                    borderRadius: '6px',
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                    color: '#15803d',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  <Pencil size={12} strokeWidth={2.5} /> Edit
+                </button>
+              </div>
               <div className="stat-value" style={{ color: availableBal > 0 ? 'var(--clr-success)' : undefined }}>
                 ₹{availableBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
@@ -319,6 +423,7 @@ export default function Wallet() {
                         <th>Description / Reference</th>
                         <th style={{ textAlign: 'right' }}>Amount (₹)</th>
                         <th style={{ textAlign: 'right' }}>Running Balance (₹)</th>
+                        <th style={{ textAlign: 'center', width: '95px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -367,6 +472,29 @@ export default function Wallet() {
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 700 }}>
                               ₹{runningBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                title="Delete Transaction"
+                                onClick={() => openDeleteTxModal(tx)}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #fecaca',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <Trash2 size={12} strokeWidth={2.5} /> Delete
+                              </button>
                             </td>
                           </tr>
                         );
@@ -676,6 +804,217 @@ export default function Wallet() {
                 </div>
               </>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Edit Wallet Balance Modal ═══ */}
+      {editBalanceModalOpen && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setEditBalanceModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div 
+            className="modal" 
+            style={{ maxWidth: 480, width: '100%', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <Sliders size={20} strokeWidth={2.5} style={{ color: 'var(--clr-primary)' }} /> Edit Wallet Balance
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setEditBalanceModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNewBalance} style={{ padding: '1.5rem' }}>
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Current Wallet Balance
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--clr-primary)' }}>
+                  ₹{availableBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: 'block', marginBottom: '0.35rem' }}>
+                  New Target Balance (₹):
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-input"
+                  style={{ fontSize: '1.35rem', fontWeight: 800, padding: '0.75rem 1rem', width: '100%' }}
+                  placeholder="Enter new wallet balance (e.g. 50000)"
+                  value={newTargetBalance}
+                  onChange={(e) => setNewTargetBalance(e.target.value)}
+                  required
+                />
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                  {Number(newTargetBalance) >= 0 && Number(newTargetBalance) !== availableBal && (
+                    <strong style={{ color: Number(newTargetBalance) > availableBal ? 'var(--clr-success)' : 'var(--clr-danger)' }}>
+                      Adjustment: {Number(newTargetBalance) > availableBal ? '+' : ''}₹{(Number(newTargetBalance) - availableBal).toFixed(2)}
+                    </strong>
+                  )}
+                </span>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: 'block', marginBottom: '0.35rem' }}>
+                  Reason / Notes (Optional):
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ width: '100%', padding: '0.7rem 1rem' }}
+                  placeholder="e.g. Opening balance reconciliation, Cash drawer count"
+                  value={balanceEditReason}
+                  onChange={(e) => setBalanceEditReason(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setEditBalanceModalOpen(false)}
+                  disabled={submittingBalanceEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingBalanceEdit}
+                  style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  {submittingBalanceEdit ? <span className="spinner"></span> : 'Update Balance'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Delete Transaction Modal ═══ */}
+      {txToDelete && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setTxToDelete(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div 
+            className="modal" 
+            style={{ maxWidth: 460, width: '100%', borderRadius: 'var(--radius-xl)', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ background: '#fef2f2', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, color: '#991b1b' }}>
+                <AlertTriangle size={20} strokeWidth={2.5} style={{ color: '#dc2626' }} /> Delete Transaction Record
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setTxToDelete(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ margin: '0 0 1rem 0', fontSize: 'var(--fs-base)' }}>
+                Are you sure you want to delete this transaction record?
+              </p>
+
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Type:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)', textTransform: 'capitalize' }}>
+                    {txToDelete.transactionType || txToDelete.transaction_type}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Date:</span>
+                  <strong style={{ fontSize: 'var(--fs-sm)' }}>
+                    {formatTxDate(txToDelete)}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Amount:</span>
+                  <strong style={{ fontSize: 'var(--fs-base)', color: Number(txToDelete.amount) >= 0 ? 'var(--clr-success)' : 'var(--clr-danger)' }}>
+                    ₹{Math.abs(Number(txToDelete.amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--clr-text-secondary)', fontWeight: 600 }}>Description:</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-dim)', textAlign: 'right', maxWidth: '60%' }}>
+                    {txToDelete.description || '—'}
+                  </span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--clr-text-muted)', margin: '0 0 1.25rem 0' }}>
+                ℹ️ Deleting this record will automatically recalculate subsequent running balances.
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setTxToDelete(null)}
+                  disabled={deletingTx}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteTx}
+                  disabled={deletingTx}
+                  style={{
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 800,
+                    padding: '0.65rem 1.25rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {deletingTx ? <span className="spinner"></span> : <><Trash2 size={16} strokeWidth={2.5} /> Delete Record</>}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

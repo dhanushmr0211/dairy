@@ -137,6 +137,10 @@ export function getWalletBalance() {
   return request('/wallet/balance');
 }
 
+export function updateWalletBalance(body) {
+  return request('/wallet/balance', { method: 'PUT', body: JSON.stringify(body) });
+}
+
 export function getWalletSummary() {
   return request('/wallet/summary');
 }
@@ -144,6 +148,10 @@ export function getWalletSummary() {
 export function getWalletTransactions(params = {}) {
   const query = new URLSearchParams(params).toString();
   return request(`/wallet/transactions${query ? `?${query}` : ''}`);
+}
+
+export function deleteWalletTransaction(id) {
+  return request(`/wallet/transactions/${id}`, { method: 'DELETE' });
 }
 
 export function recordWalletReceipt(body) {

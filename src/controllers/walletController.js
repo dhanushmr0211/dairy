@@ -5,7 +5,7 @@ const distributionModel = require('../models/distributionModel');
 const cycleModel = require('../models/cycleModel');
 const paymentModel = require('../models/paymentModel');
 const { getCyclePaymentSummary } = require('../utils/paymentCalculator');
-const { parsePositiveNumber, parseValidDate, toIsoDateString } = require('../utils/validation');
+const { parsePositiveInteger, parsePositiveNumber, parseValidDate, toIsoDateString } = require('../utils/validation');
 
 // ── Configuration ──
 const DEFAULT_MARGIN = 500;
@@ -741,9 +741,111 @@ const getDistributionDetail = asyncHandler(async (req, res) => {
   });
 });
 
+const updateWalletBalance = asyncHandler(async (req, res) => {
+  const targetBalRaw = req.body.newBalance !== undefined ? req.body.newBalance : req.body.balance;
+  if (targetBalRaw === undefined || targetBalRaw === null || targetBalRaw === '') {
+    return res.status(400).json({ success: false, message: 'newBalance is required.' });
+  }
+
+  const newBalance = Number(targetBalRaw);
+  if (!Number.isFinite(newBalance) || newBalance < 0) {
+    return res.status(400).json({ success: false, message: 'newBalance must be a non-negative number.' });
+  }
+
+  const { reason, description, date } = req.body;
+  const parsedDate = date ? parseValidDate(date) : new Date();
+  const isoDate = parsedDate ? toIsoDateString(parsedDate) : toIsoDateString(new Date());
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const currentBalance = await walletModel.getWalletBalanceForUpdate(client);
+    const diff = Number((newBalance - currentBalance).toFixed(2));
+
+    let entry = null;
+    if (diff !== 0) {
+      const descText = reason || description || `Wallet balance manually adjusted from ₹${currentBalance.toFixed(2)} to ₹${newBalance.toFixed(2)}`;
+      entry = await walletModel.createLedgerEntry(
+        {
+          transactionType: 'adjustment',
+          amount: diff,
+          transactionDate: isoDate,
+          description: descText,
+        },
+        client
+      );
+
+      // Invalidate pending previews
+      await client.query("UPDATE distribution_previews SET status = 'rejected' WHERE status = 'pending'");
+    }
+
+    await client.query('COMMIT');
+
+    const updatedBalance = await walletModel.getWalletBalance();
+
+    res.json({
+      success: true,
+      message: diff === 0
+        ? 'Wallet balance is already at the target amount.'
+        : `Wallet balance successfully adjusted to ₹${updatedBalance.toFixed(2)}.`,
+      previousBalance: currentBalance,
+      newBalance: updatedBalance,
+      adjustmentAmount: diff,
+      transaction: entry,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
+const deleteTransaction = asyncHandler(async (req, res) => {
+  const parsedId = parsePositiveInteger(req.params.id);
+  if (!parsedId) {
+    return res.status(400).json({ success: false, message: 'Invalid transaction ID.' });
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+
+    const tx = await walletModel.findTransactionById(parsedId, client);
+    if (!tx) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Transaction record not found.' });
+    }
+
+    const deleted = await walletModel.deleteLedgerEntry(parsedId, client);
+
+    // Invalidate pending previews since wallet balance changed
+    await client.query("UPDATE distribution_previews SET status = 'rejected' WHERE status = 'pending'");
+
+    const newBalance = await walletModel.getWalletBalance(client);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Transaction record deleted successfully.',
+      deletedTransaction: deleted,
+      newBalance,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = {
   recordReceipt,
   getWalletBalance,
+  updateWalletBalance,
+  deleteTransaction,
   getTransactions,
   getWalletSummary,
   distributePreview,
